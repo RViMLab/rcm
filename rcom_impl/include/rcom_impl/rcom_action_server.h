@@ -45,6 +45,7 @@ class RCoMActionServer {
 
         // Robot model
         std::string _planning_group;
+        double _alpha;
         moveit::planning_interface::MoveGroupInterface _move_group;
         std::string _link_pi, _link_pip1;
 
@@ -84,6 +85,7 @@ RCoMActionServer::RCoMActionServer(
     _control_client(control_client), _ac(nh, control_client, false),
     _rcom(kt, krcm, lambda0, dt),
     _planning_group(planning_group),
+    _alpha(alpha),
     _move_group(planning_group),
     _link_pi(link_pi),
     _link_pip1(link_pip1),
@@ -238,7 +240,7 @@ actionlib::SimpleClientGoalState RCoMActionServer::_executeGoal(std::vector<doub
     
     // Execute motion on client
     trajectory_msgs::JointTrajectoryPoint point;
-    point.time_from_start = ros::Duration(_rcom.getdt());
+    point.time_from_start = ros::Duration(_rcom.getdt()/_alpha);
     point.positions = q;
 
     control_msgs::FollowJointTrajectoryGoal goal;

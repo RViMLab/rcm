@@ -6,7 +6,7 @@ krcm: 0.1
 lambda0: 0.7
 dt: 0.1
 planning_group: 'arm_endoscope'
-alpha: 1.0
+alpha: 0.1
 
 link_pi: 'lbr_link_ee'
 link_pip1: 'endoscope_link_cm'
