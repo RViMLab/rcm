@@ -2,6 +2,7 @@
 
 #include <eigen3/Eigen/Core>
 
+
 // taken from https://gist.github.com/javidcf/25066cf85e71105d57b6
 template <class MatT>
 Eigen::Matrix<typename MatT::Scalar, MatT::ColsAtCompileTime, MatT::RowsAtCompileTime>

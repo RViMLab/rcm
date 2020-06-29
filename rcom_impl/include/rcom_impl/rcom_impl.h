@@ -4,6 +4,7 @@
 
 #include <rcom_impl/pseudo_inverse.h>
 
+
 namespace rcom {
 
 /**
