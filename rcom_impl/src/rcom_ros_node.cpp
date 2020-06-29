@@ -32,12 +32,40 @@ int main(int argc, char** argv) {
     move_group.move();
     move_group.stop();
 
-    // RCOMNode rcom(nh, 0.1, 1e0, 1e-1);  // k_t and k_rcm as in paper
+    // Parameters
+    std::string action_server;
+    std::string control_client;
+    double kt;
+    double krcm;
+    double lambda0;
+    double dt;
+    std::string planning_group;
+    double alpha;
+    std::string link_pi;
+    std::string link_pip1;
+    double dtd;
+    double dp_trocar;
+    int max_iter;
+
+    nh.getParam("action_server", action_server);
+    nh.getParam("control_client", control_client);
+    nh.getParam("kt", kt);
+    nh.getParam("krcm", krcm);
+    nh.getParam("lambda0", lambda0);
+    nh.getParam("dt", dt);
+    nh.getParam("planning_group", planning_group);
+    nh.getParam("alpha", alpha);
+    nh.getParam("link_pi", link_pi);
+    nh.getParam("link_pip1", link_pip1);
+    nh.getParam("dtd", dtd);
+    nh.getParam("dp_trocar", dp_trocar);
+    nh.getParam("max_iter", max_iter);
+
     rcom::RCoMActionServer rcom_as(
-        nh, "RCoM_ActionServer", "PositionJointInterface_trajectory_controller/follow_joint_trajectory",
-        1e0, 1e-1, 0.7, 0.1,
-        "arm_endoscope", 0.1, "lbr_link_ee", "endoscope_link_cm",
-        1., 1., 10    
+        nh, action_server, control_client,
+        kt, krcm, lambda0, dt,
+        planning_group, alpha, link_pi, link_pip1,
+        dtd, dp_trocar, max_iter    
     );
 
     ros::waitForShutdown();

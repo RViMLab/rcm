@@ -1,6 +1,7 @@
 <launch>
 
     <group ns="lbr">
+        <rosparam command="load" file="$(find rcom_impl)/config/params.yml"/>
         <node pkg="rcom_impl" name="rcom_node" type="rcom_node" output="screen"/>
     </group>
 

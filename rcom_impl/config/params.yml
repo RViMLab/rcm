@@ -1,10 +1,16 @@
-# gains, equation 7
-k_t: 10.
-k_RCM: 1.
+action_server: 'RCoM_ActionServer'
+control_client: 'PositionJointInterface_trajectory_controller/follow_joint_trajectory'
 
-# update time
+kt: 1.
+krcm: 0.1
+lambda0: 0.7
 dt: 0.1
+planning_group: 'arm_endoscope'
+alpha: 1.0
 
-# end-effector and link prior to that, see fig. 1
-pi: 'lbr_link_ee'
-pip1: 'endoscope_link_cm'
+link_pi: 'lbr_link_ee'
+link_pip1: 'endoscope_link_cm'
+
+dtd: 0.1
+dp_trocar: 0.1
+max_iter: 10
