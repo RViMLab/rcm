@@ -16,13 +16,14 @@
 
 #include <rcom_impl/rcom_impl.h>
 
+
 namespace rcom
 {
 
 class RCoMActionServer {
     public:
         RCoMActionServer(
-            ros::NodeHandle nh, std::string server, std::string client, 
+            ros::NodeHandle nh, std::string action_server, std::string control_client, 
             double kt, double krcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
             double dtd, double dp_trocar, int max_iter
@@ -32,11 +33,11 @@ class RCoMActionServer {
         ros::NodeHandle _nh;
 
         // Server to handle goals via _computeUpdateCB callback
-        std::string _server;
+        std::string _action_server;
         actionlib::SimpleActionServer<rcom_msgs::rcomAction> _as;
 
         // Client to request joint angle goals on actual robot
-        std::string _client;
+        std::string _control_client;
         actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> _ac;
 
         // Actual RCoM implementation
@@ -75,12 +76,12 @@ class RCoMActionServer {
 
 
 RCoMActionServer::RCoMActionServer(
-    ros::NodeHandle nh, std::string server, std::string client, 
+    ros::NodeHandle nh, std::string action_server, std::string control_client, 
     double kt, double krcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
     double dtd, double dp_trocar, int max_iter
-) : _server(server), _as(nh, server, boost::bind(&RCoMActionServer::_goalCB, this, _1), false),
-    _client(client), _ac(nh, client, false),
+) : _action_server(action_server), _as(nh, action_server, boost::bind(&RCoMActionServer::_goalCB, this, _1), false),
+    _control_client(control_client), _ac(nh, control_client, false),
     _rcom(kt, krcm, lambda0, dt),
     _planning_group(planning_group),
     _move_group(planning_group),
@@ -107,7 +108,7 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     Eigen::VectorXd td = td_3d;  // sadly eigen_conversions does not support matrices, of which VectorXd is a special case
 
     if (_as.isPreemptRequested() || !ros::ok()) {
-        ROS_INFO("%s: Preempted", _server.c_str());
+        ROS_INFO("%s: Preempted", _action_server.c_str());
         _as.setPreempted();
         update = false;
     }
@@ -122,7 +123,7 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
         auto e = _computeError(q, td, p_trocar);
 
         if (std::get<0>(e).norm() > _dtd || std::get<1>(e).norm() > _dp_trocar ) {
-            ROS_INFO("%s: Aborted due to divergent RCoM", _server.c_str());
+            ROS_INFO("%s: Aborted due to divergent RCoM", _action_server.c_str());
             _as.setAborted();
             update = false;
         }
@@ -134,18 +135,18 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
                 e = _computeError(q, td, p_trocar);
 
                 if (std::get<0>(e).norm() <= _dtd && std::get<1>(e).norm() <= _dp_trocar ) {
-                    ROS_INFO("%s: Suceeded", _server.c_str());
+                    ROS_INFO("%s: Suceeded", _action_server.c_str());
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, td, p_trocar);
                     _as.setSucceeded(rs);
                     update = false;
                 }
                 else {
-                    ROS_INFO("%s: Iterating on joint angles", _server.c_str());
+                    ROS_INFO("%s: Iterating on joint angles", _action_server.c_str());
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, td, p_trocar);
                     _as.publishFeedback(fb);
 
                     if (iter > _max_iter) {
-                        ROS_INFO("%s: Aborted due to max_iter", _server.c_str());
+                        ROS_INFO("%s: Aborted due to max_iter", _action_server.c_str());
                         _as.setAborted();
                         update = false;
                     }
@@ -154,7 +155,7 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
                 }
             }
             else {
-                ROS_INFO("%s: Aborted due to client %s failure", _server.c_str(), _client.c_str());
+                ROS_INFO("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
                 _as.setAborted();
                 update = false;
             }
@@ -226,7 +227,7 @@ std::tuple<Eigen::VectorXd, Eigen::Vector3d> RCoMActionServer::_computeError(
     auto prcm = _rcom.computePRCoM(pi, pip1);
 
     // Compute error
-    auto dtd = td - pi;
+    auto dtd = td - pip1;
     auto dp_trocar = p_trocar - prcm;
 
     return std::make_tuple(dtd, dp_trocar);
@@ -265,7 +266,6 @@ T RCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d
 
     return fb;
 };
-
 
 } // namespace rcom
 
