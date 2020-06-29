@@ -1,0 +1,10 @@
+# gains, equation 7
+k_t: 10.
+k_RCM: 1.
+
+# update time
+dt: 0.1
+
+# end-effector and link prior to that, see fig. 1
+pi: 'lbr_link_ee'
+pip1: 'endoscope_link_cm'
