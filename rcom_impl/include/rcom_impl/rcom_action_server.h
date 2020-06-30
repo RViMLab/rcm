@@ -26,7 +26,7 @@ class RCoMActionServer {
             ros::NodeHandle nh, std::string action_server, std::string control_client, 
             double kt, double krcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-            double dtd, double dp_trocar, int max_iter
+            double dtd, double dp_trocar, double conv_dtd, double conv_dp_trocar, int max_iter
         );
 
     private:
@@ -50,7 +50,7 @@ class RCoMActionServer {
         std::string _link_pi, _link_pip1;
 
         // Error margin and max iterations
-        double _dtd, _dp_trocar;
+        double _dtd, _dp_trocar, _conv_dtd, _conv_dp_trocar;
         int _max_iter;
 
 
@@ -60,11 +60,14 @@ class RCoMActionServer {
         // State machine
         std::vector<double> _computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
 
-        // Compute error between current and desired values
+        // Compute error between current and desired values via forward kinematics
+        std::tuple<Eigen::Vector3d, Eigen::Vector3d> _computeForwardKinematics(std::vector<double>& q);
+
         std::tuple<Eigen::VectorXd, Eigen::Vector3d> _computeError(
-            std::vector<double>& q, 
             Eigen::VectorXd& td,
-            Eigen::Vector3d& p_trocar
+            Eigen::Vector3d& pip1,
+            Eigen::Vector3d& p_trocar,
+            Eigen::Vector3d& prcm
         );
 
         // Execute goal on client robot
@@ -72,7 +75,7 @@ class RCoMActionServer {
 
         // Compute goal feedback and result
         template<typename T>
-        T _computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& td, Eigen::Vector3d& p_trocar);
+        T _computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::Vector3d& td, Eigen::Vector3d& p_trocar);
 };
 
 
@@ -80,7 +83,7 @@ RCoMActionServer::RCoMActionServer(
     ros::NodeHandle nh, std::string action_server, std::string control_client, 
     double kt, double krcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-    double dtd, double dp_trocar, int max_iter
+    double dtd, double dp_trocar, double conv_dtd, double conv_dp_trocar, int max_iter
 ) : _action_server(action_server), _as(nh, action_server, boost::bind(&RCoMActionServer::_goalCB, this, _1), false),
     _control_client(control_client), _ac(nh, control_client, false),
     _rcom(kt, krcm, lambda0, dt),
@@ -89,7 +92,7 @@ RCoMActionServer::RCoMActionServer(
     _move_group(planning_group),
     _link_pi(link_pi),
     _link_pip1(link_pip1),
-    _dtd(dtd), _dp_trocar(dp_trocar), _max_iter(max_iter) {    
+    _dtd(dtd), _dp_trocar(dp_trocar), _conv_dtd(conv_dtd), _conv_dp_trocar(conv_dp_trocar), _max_iter(max_iter) {    
     
     _as.start();
     _move_group.setMaxVelocityScalingFactor(alpha);
@@ -101,8 +104,8 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     bool update = true;
     
     // Get desired positions from goal
-    Eigen::Vector3d td_3d;
-    Eigen::Vector3d p_trocar;
+    Eigen::Vector3d td_3d;     // task
+    Eigen::Vector3d p_trocar;  // trocar
 
     tf::vectorMsgToEigen(goal->positions.td, td_3d);
     tf::vectorMsgToEigen(goal->positions.p_trocar, p_trocar);
@@ -122,7 +125,9 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
 
         // Compute joint angles that satisfy desired positions
         auto q = _computeUpdate(td, p_trocar);
-        auto e = _computeError(q, td, p_trocar);
+        auto p = _computeForwardKinematics(q);
+        auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+        auto e = _computeError(td, std::get<1>(p), p_trocar, prcm);
 
         if (std::get<0>(e).norm() > _dtd || std::get<1>(e).norm() > _dp_trocar ) {
             ROS_INFO("%s: Aborted due to divergent RCoM", _action_server.c_str());
@@ -134,17 +139,19 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
 
             if (status == actionlib::SimpleClientGoalState::SUCCEEDED) {
                 q = _move_group.getCurrentJointValues();
-                e = _computeError(q, td, p_trocar);
+                p = _computeForwardKinematics(q);
+                prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+                e = _computeError(td, std::get<1>(p), p_trocar, prcm);
 
-                if (std::get<0>(e).norm() <= _dtd && std::get<1>(e).norm() <= _dp_trocar ) {
+                if (std::get<0>(e).norm() <= _conv_dtd && std::get<1>(e).norm() <= _conv_dp_trocar ) {
                     ROS_INFO("%s: Suceeded", _action_server.c_str());
-                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, td, p_trocar);
+                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, std::get<1>(p), prcm);
                     _as.setSucceeded(rs);
                     update = false;
                 }
                 else {
                     ROS_INFO("%s: Iterating on joint angles", _action_server.c_str());
-                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, td, p_trocar);
+                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, std::get<1>(p), prcm);
                     _as.publishFeedback(fb);
 
                     if (iter > _max_iter) {
@@ -211,11 +218,8 @@ std::vector<double> RCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Eigen:
 };
 
 
-std::tuple<Eigen::VectorXd, Eigen::Vector3d> RCoMActionServer::_computeError(
-    std::vector<double>& q, 
-    Eigen::VectorXd& td,
-    Eigen::Vector3d& p_trocar) {
-    
+std::tuple<Eigen::Vector3d, Eigen::Vector3d> RCoMActionServer::_computeForwardKinematics(std::vector<double>& q) {
+
     // Compute forward kinematics
     auto robot_model = _move_group.getRobotModel();
     auto robot_state = moveit::core::RobotState(robot_model);
@@ -226,7 +230,17 @@ std::tuple<Eigen::VectorXd, Eigen::Vector3d> RCoMActionServer::_computeError(
 
     auto pi = robot_state.getGlobalLinkTransform(_link_pi).translation();
     auto pip1 = robot_state.getGlobalLinkTransform(_link_pip1).translation();
-    auto prcm = _rcom.computePRCoM(pi, pip1);
+
+    return std::make_tuple(pi, pip1);
+};
+
+
+std::tuple<Eigen::VectorXd, Eigen::Vector3d> RCoMActionServer::_computeError(
+    Eigen::VectorXd& td,
+    Eigen::Vector3d& pip1,
+    Eigen::Vector3d& p_trocar,
+    Eigen::Vector3d& prcm
+) {
 
     // Compute error
     auto dtd = td - pip1;
@@ -255,7 +269,7 @@ actionlib::SimpleClientGoalState RCoMActionServer::_executeGoal(std::vector<doub
 
 
 template<typename T>
-T RCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& td, Eigen::Vector3d& p_trocar) {
+T RCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::Vector3d& td, Eigen::Vector3d& p_trocar) {
     T fb;
 
     // Feedback errors

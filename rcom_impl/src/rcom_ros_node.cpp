@@ -33,18 +33,12 @@ int main(int argc, char** argv) {
     move_group.stop();
 
     // Parameters
-    std::string action_server;
-    std::string control_client;
-    double kt;
-    double krcm;
-    double lambda0;
-    double dt;
+    std::string action_server, control_client;
+    double kt, krcm, lambda0, dt;
     std::string planning_group;
     double alpha;
-    std::string link_pi;
-    std::string link_pip1;
-    double dtd;
-    double dp_trocar;
+    std::string link_pi, link_pip1;
+    double dtd, dp_trocar, conv_dtd, conv_dp_trocar;
     int max_iter;
 
     nh.getParam("action_server", action_server);
@@ -59,13 +53,15 @@ int main(int argc, char** argv) {
     nh.getParam("link_pip1", link_pip1);
     nh.getParam("dtd", dtd);
     nh.getParam("dp_trocar", dp_trocar);
+    nh.getParam("conv_dtd", conv_dtd);
+    nh.getParam("conv_dp_trocar", conv_dp_trocar);
     nh.getParam("max_iter", max_iter);
 
     rcom::RCoMActionServer rcom_as(
         nh, action_server, control_client,
         kt, krcm, lambda0, dt,
         planning_group, alpha, link_pi, link_pip1,
-        dtd, dp_trocar, max_iter    
+        dtd, dp_trocar, conv_dtd, conv_dp_trocar, max_iter    
     );
 
     ros::waitForShutdown();
