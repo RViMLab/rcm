@@ -119,7 +119,7 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         _lambda += _dt*dq[dq.size() - 1];
 
         // Return only joint velocities, not dlambda
-        return dq.topRows(dq.size() - 1);
+        return _dt*dq.topRows(dq.size() - 1);
 }
 
 
@@ -157,7 +157,7 @@ Eigen::VectorXd RCoMImpl::_computeError(Eigen::VectorXd& td, Eigen::MatrixBase<d
     auto e_t_lower = p_trocar - p;
 
     Eigen::VectorXd e_t(e_t_upper.rows() + e_t_lower.rows());
-    e_t << e_t_upper, e_t_upper;
+    e_t << e_t_upper, e_t_lower;
     return e_t;
 }
 
