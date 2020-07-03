@@ -4,15 +4,15 @@ Implementation of 'Task Control with Remote Center of Motion Constraint for Mini
 ## Overview
 Two classes provide functionallity
 
- - [RCoMImpl](include/rcom_impl/rcom_impl.h), computes joint angle updates under control law presented in paper
+ - [RCoMImpl](rcom_impl/include/rcom_impl/rcom_impl.h), computes joint angle updates under control law presented in paper
 
- - [RCoMActionServer](include/rcom_impl/rcom_action_server.h), has a [RCoMImpl](include/rcom_impl/rcom_impl.h) and implements a state machine that communicates to ROS via an action client
+ - [RCoMActionServer](rcom_impl/include/rcom_impl/rcom_action_server.h), has a [RCoMImpl](rcom_impl/include/rcom_impl/rcom_impl.h) and implements a state machine that communicates to ROS via an action client
 
 Overview shown below
 ![Image](img/rcom_overview.png)
 
 ## Configuration
-Configurations in [params.yml](config/params.yml).
+Configurations in [params.yml](rcom_impl/config/params.yml).
 
  - RCoM computed in between links `link_pi` and `link_pip1`
  - Controls `planning_group`, as defined by Moveit! setup assistant
