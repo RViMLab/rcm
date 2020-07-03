@@ -1,12 +1,12 @@
 action_server: 'RCoM_ActionServer'
 control_client: 'PositionJointInterface_trajectory_controller/follow_joint_trajectory'
 
-kt: 0.1
-krcm: 0.01
+kt: 1.0
+krcm: 0.5
 lambda0: 0.5
 dt: 0.1
 planning_group: 'arm_endoscope'
-alpha: 0.1
+alpha: 1.0
 
 link_pi: 'endoscope_link_1'
 link_pip1: 'endoscope_link_cm'
@@ -16,4 +16,4 @@ dp_trocar: 0.1
 
 conv_dtd: 0.01
 conv_dp_trocar: 0.01
-max_iter: 10
+max_iter: 20

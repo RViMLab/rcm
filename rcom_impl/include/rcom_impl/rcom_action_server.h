@@ -143,6 +143,9 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
                 prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
                 e = _computeError(td, std::get<1>(p), p_trocar, prcm);
 
+                // Update lambda to remove drift
+                _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
+
                 if (std::get<0>(e).norm() <= _conv_dtd && std::get<1>(e).norm() <= _conv_dp_trocar ) {
                     ROS_INFO("%s: Suceeded", _action_server.c_str());
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, std::get<1>(p), prcm);

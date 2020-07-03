@@ -52,6 +52,15 @@ class RCoMImpl {
         Eigen::Vector3d computePRCoM(Eigen::MatrixBase<derived>& p_i, Eigen::MatrixBase<derived>& p_ip1);
 
         /**
+         * @brief feedback lambda to remove drift
+         * 
+         * @param p_i see fig. 1, paper (Eigen::Vector3d)
+         * @param p_ip1 see fig. 1, paper (Eigen::Vector3d)
+         * @param p_trocar trocar position (Eigen::Vector3d)
+        **/
+        void feedbackLambda(Eigen::Vector3d& p_i, Eigen::Vector3d& p_ip1, Eigen::Vector3d& p_trocar);
+
+        /**
          * @brief get _dt
         **/
         inline const double& getdt() const { return _dt; };
@@ -127,6 +136,14 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
 template<typename derived>
 Eigen::Vector3d RCoMImpl::computePRCoM(Eigen::MatrixBase<derived>& p_i, Eigen::MatrixBase<derived>& p_ip1) {
     return p_i + _lambda*(p_ip1 - p_i);
+}
+
+
+// feedback lambda to remove drift, not in paper
+void RCoMImpl::feedbackLambda(Eigen::Vector3d& p_i, Eigen::Vector3d& p_ip1, Eigen::Vector3d& p_trocar) {
+    if (p_i.dot(p_trocar) != p_ip1.dot(p_trocar)) {
+        _lambda = (p_trocar.dot(p_trocar) - p_i.dot(p_trocar))/(p_ip1.dot(p_trocar) - p_i.dot(p_trocar));
+    }
 }
 
 
