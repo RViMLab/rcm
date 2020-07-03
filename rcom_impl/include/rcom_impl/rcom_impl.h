@@ -141,9 +141,7 @@ Eigen::Vector3d RCoMImpl::computePRCoM(Eigen::MatrixBase<derived>& p_i, Eigen::M
 
 // feedback lambda to remove drift, not in paper
 void RCoMImpl::feedbackLambda(Eigen::Vector3d& p_i, Eigen::Vector3d& p_ip1, Eigen::Vector3d& p_trocar) {
-    if (p_i.dot(p_trocar) != p_ip1.dot(p_trocar)) {
-        _lambda = (p_trocar.dot(p_trocar) - p_i.dot(p_trocar))/(p_ip1.dot(p_trocar) - p_i.dot(p_trocar));
-    }
+    _lambda = (p_ip1 - p_i).normalized().dot(p_trocar - p_i)/(p_ip1 - p_i).norm();
 }
 
 
