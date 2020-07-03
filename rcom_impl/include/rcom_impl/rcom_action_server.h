@@ -26,7 +26,7 @@ class RCoMActionServer {
             ros::NodeHandle nh, std::string action_server, std::string control_client, 
             double kt, double krcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-            double dtd, double dp_trocar, double conv_dtd, double conv_dp_trocar, int max_iter
+            double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, int max_iter
         );
 
     private:
@@ -50,7 +50,7 @@ class RCoMActionServer {
         std::string _link_pi, _link_pip1;
 
         // Error margin and max iterations
-        double _dtd, _dp_trocar, _conv_dtd, _conv_dp_trocar;
+        double _t1_td, _t1_p_trocar, _t2_td, _t2_p_trocar;
         int _max_iter;
 
 
@@ -83,7 +83,7 @@ RCoMActionServer::RCoMActionServer(
     ros::NodeHandle nh, std::string action_server, std::string control_client, 
     double kt, double krcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-    double dtd, double dp_trocar, double conv_dtd, double conv_dp_trocar, int max_iter
+    double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, int max_iter
 ) : _action_server(action_server), _as(nh, action_server, boost::bind(&RCoMActionServer::_goalCB, this, _1), false),
     _control_client(control_client), _ac(nh, control_client, false),
     _rcom(kt, krcm, lambda0, dt),
@@ -92,7 +92,7 @@ RCoMActionServer::RCoMActionServer(
     _move_group(planning_group),
     _link_pi(link_pi),
     _link_pip1(link_pip1),
-    _dtd(dtd), _dp_trocar(dp_trocar), _conv_dtd(conv_dtd), _conv_dp_trocar(conv_dp_trocar), _max_iter(max_iter) {    
+    _t1_td(t1_td), _t1_p_trocar(t1_p_trocar), _t2_td(t2_td), _t2_p_trocar(t2_p_trocar), _max_iter(max_iter) {    
     
     _as.start();
     _move_group.setMaxVelocityScalingFactor(alpha);
@@ -129,7 +129,7 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
         auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
         auto e = _computeError(td, std::get<1>(p), p_trocar, prcm);
 
-        if (std::get<0>(e).norm() > _dtd || std::get<1>(e).norm() > _dp_trocar ) {
+        if (std::get<0>(e).norm() > _t1_td || std::get<1>(e).norm() > _t1_p_trocar ) {
             ROS_INFO("%s: Aborted due to divergent RCoM", _action_server.c_str());
             _as.setAborted();
             update = false;
@@ -146,7 +146,7 @@ void RCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
                 // Update lambda to remove drift
                 _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
-                if (std::get<0>(e).norm() <= _conv_dtd && std::get<1>(e).norm() <= _conv_dp_trocar ) {
+                if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
                     ROS_INFO("%s: Suceeded", _action_server.c_str());
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, std::get<1>(p), prcm);
                     _as.setSucceeded(rs);
@@ -246,10 +246,10 @@ std::tuple<Eigen::VectorXd, Eigen::Vector3d> RCoMActionServer::_computeError(
 ) {
 
     // Compute error
-    auto dtd = td - pip1;
-    auto dp_trocar = p_trocar - prcm;
+    auto t1_td = td - pip1;
+    auto t1_p_trocar = p_trocar - prcm;
 
-    return std::make_tuple(dtd, dp_trocar);
+    return std::make_tuple(t1_td, t1_p_trocar);
 };
 
 

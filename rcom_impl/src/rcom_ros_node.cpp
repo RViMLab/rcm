@@ -38,7 +38,7 @@ int main(int argc, char** argv) {
     std::string planning_group;
     double alpha;
     std::string link_pi, link_pip1;
-    double dtd, dp_trocar, conv_dtd, conv_dp_trocar;
+    double t1_td, t1_p_trocar, t2_td, t2_p_trocar;
     int max_iter;
 
     nh.getParam("action_server", action_server);
@@ -51,17 +51,17 @@ int main(int argc, char** argv) {
     nh.getParam("alpha", alpha);
     nh.getParam("link_pi", link_pi);
     nh.getParam("link_pip1", link_pip1);
-    nh.getParam("dtd", dtd);
-    nh.getParam("dp_trocar", dp_trocar);
-    nh.getParam("conv_dtd", conv_dtd);
-    nh.getParam("conv_dp_trocar", conv_dp_trocar);
+    nh.getParam("t1_td", t1_td);
+    nh.getParam("t1_p_trocar", t1_p_trocar);
+    nh.getParam("t2_td", t2_td);
+    nh.getParam("t2_p_trocar", t2_p_trocar);
     nh.getParam("max_iter", max_iter);
 
     rcom::RCoMActionServer rcom_as(
         nh, action_server, control_client,
         kt, krcm, lambda0, dt,
         planning_group, alpha, link_pi, link_pip1,
-        dtd, dp_trocar, conv_dtd, conv_dp_trocar, max_iter    
+        t1_td, t1_p_trocar, t2_td, t2_p_trocar, max_iter    
     );
 
     ros::waitForShutdown();
