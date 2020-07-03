@@ -9,7 +9,9 @@ Two classes provide functionallity
  - [RCoMActionServer](include/rcom_impl/rcom_action_server.h), has a [RCoMImpl](include/rcom_impl/rcom_impl.h) and implements a state machine that communicates to ROS via an action client
 
 Overview shown below
-![Image](img/rcom_overview.png)
+
+<br/>
+<img src="img/rcom_overview.png" width="800"/>
 
 ## Configuration
 Configurations in [params.yml](config/params.yml).
