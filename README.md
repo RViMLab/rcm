@@ -4,7 +4,7 @@ Implementation of [Task Control with Remote Center of Motion Constraint for Mini
 ## Overview
 Two classes provide functionallity
 
- - [RCoMImpl](rcom_impl/include/rcom_impl/rcom_impl.h), computes joint angle updates under the control law presented in paper
+ - [RCoMImpl](rcom_impl/include/rcom_impl/rcom_impl.h), computes joint angle updates under the control law presented in the paper
 
  - [RCoMActionServer](rcom_impl/include/rcom_impl/rcom_action_server.h), has a [RCoMImpl](rcom_impl/include/rcom_impl/rcom_impl.h) and implements a state machine that communicates to ROS via an action client
 
