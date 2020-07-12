@@ -1,5 +1,6 @@
 #pragma once
 
+#include <exception>
 #include <eigen3/Eigen/Core>
 
 #include <rcom_impl/pseudo_inverse.h>
@@ -11,14 +12,14 @@ namespace rcom {
  * @brief Implements paper 'Task Control with Remote Center of Motion Constraint for Minimally Invasive Robotic Surgery'
  *        https://ieeexplore.ieee.org/document/6631412
  * 
- * @param kt trajectory gain (double)
+ * @param kt trajectory gain (Eigen::VectorXd)
  * @param krcm remote center of motion gain (double)
  * @param lambda0 initial relative remote center of motion position (double)
  * @param dt control interval in seconds (double)
 **/
 class RCoMImpl {
     public:
-        RCoMImpl(double kt=10., double krcm=1., double lambda0=1.0, double dt=0.1);
+        RCoMImpl(Eigen::VectorXd kt, double krcm=1., double lambda0=1.0, double dt=0.1);
 
         /**
          * @brief eq. 7, see paper
@@ -68,7 +69,7 @@ class RCoMImpl {
     private:
 
         // gains eq. 7, see paper
-        double _kt;
+        Eigen::VectorXd _kt;
         double _krcm;
 
         // eq. 1, see paper
@@ -91,7 +92,7 @@ class RCoMImpl {
 
 
 // Define functions in header due to templates
-RCoMImpl::RCoMImpl(double kt, double krcm, double lambda0, double dt) : _kt(kt), _krcm(krcm), _lambda0(lambda0), _lambda(_lambda0), _dt(dt) {   }
+RCoMImpl::RCoMImpl(Eigen::VectorXd kt, double krcm, double lambda0, double dt) : _kt(kt), _krcm(krcm), _lambda0(lambda0), _lambda(_lambda0), _dt(dt) {   }
 
 
 // eq.7, see paper
@@ -119,7 +120,8 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
 
         int nt = J_t.rows();
         Eigen::MatrixXd K = Eigen::MatrixXd::Zero(3+nt, 3+nt);
-        K.topLeftCorner(nt, nt) = _kt*Eigen::MatrixXd::Identity(nt, nt);
+        if (nt != _kt.size()) throw "Size of _kt must equal task dimension!";
+        K.topLeftCorner(nt, nt) = _kt.asDiagonal();
         K.bottomRightCorner(3, 3) = _krcm*Eigen::MatrixXd::Identity(3, 3);
 
         auto dq = J_pseudo_inverse*K*e_t;

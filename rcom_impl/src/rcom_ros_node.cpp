@@ -1,3 +1,5 @@
+#include <vector>
+
 #include <ros/ros.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 
@@ -34,7 +36,8 @@ int main(int argc, char** argv) {
 
     // Parameters
     std::string action_server, control_client;
-    double kt, krcm, lambda0, dt;
+    std::vector<double> kt;
+    double krcm, lambda0, dt;
     std::string planning_group;
     double alpha;
     std::string link_pi, link_pip1;
