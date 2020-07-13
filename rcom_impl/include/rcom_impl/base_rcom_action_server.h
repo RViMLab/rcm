@@ -41,6 +41,10 @@ class BaseRCoMActionServer {
         std::string _control_client;
         actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction> _ac;
 
+        // Publisher to publish current state via timer callback this->_timerCB
+        ros::Timer _timer;
+        ros::Publisher _state_pub;
+
         // Actual RCoM implementation
         rcom::RCoMImpl _rcom;
 
@@ -54,9 +58,11 @@ class BaseRCoMActionServer {
         double _t1_td, _t1_p_trocar, _t2_td, _t2_p_trocar;
         int _max_iter;
 
-
         // Goal callback, state machine
         void _goalCB(const rcom_msgs::rcomGoalConstPtr& goal);
+
+        // Timer callback, publish current state
+        void _timerCB(const ros::TimerEvent&);
 
         // Update remote center of motion with task Jacobian
         virtual std::vector<double> _computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) = 0;
@@ -99,6 +105,9 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     
     _as.start();
     _move_group.setMaxVelocityScalingFactor(alpha);
+
+    _timer = nh.createTimer(ros::Duration(dt), &BaseRCoMActionServer::_timerCB, this);
+    _state_pub = nh.advertise<rcom_msgs::rcom>(action_server + "/state", 1);
 }
 
 
@@ -110,7 +119,7 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     Eigen::VectorXd td;        // task
     Eigen::Vector3d p_trocar;  // trocar
 
-    td = Eigen::VectorXd::Map(goal->positions.td.data(), goal->positions.td.size());  // sadly eigen_conversions does not support matrices, of which VectorXd is a special case
+    td = Eigen::VectorXd::Map(goal->positions.task.data(), goal->positions.task.size());  // sadly eigen_conversions does not support matrices, of which VectorXd is a special case
     tf::vectorMsgToEigen(goal->positions.p_trocar, p_trocar);
 
     if (_as.isPreemptRequested() || !ros::ok()) {
@@ -179,6 +188,25 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
 }
 
 
+void BaseRCoMActionServer::_timerCB(const ros::TimerEvent&) {
+
+    // Compute current state
+    auto q = _move_group.getCurrentJointValues();
+    auto p = _computeRCoMForwardKinematics(q);
+    auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+    auto t = _computeTaskForwardKinematics(q);
+
+    // Publish current state
+    rcom_msgs::rcom msg;
+    msg.task.resize(t.size());
+
+    tf::vectorEigenToMsg(prcm, msg.p_trocar);
+    Eigen::Vector3d::Map(msg.task.data(), msg.task.size()) = t;
+
+    _state_pub.publish(msg);
+}
+
+
 std::tuple<Eigen::Vector3d, Eigen::Vector3d> BaseRCoMActionServer::_computeRCoMForwardKinematics(std::vector<double>& q) {
 
     // Compute forward kinematics
@@ -234,15 +262,15 @@ T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vect
     T fb;
 
     // Allocate space for mapping
-    fb.errors.td.resize(std::get<0>(e).size());
-    fb.positions.td.resize(td.size());
+    fb.errors.task.resize(std::get<0>(e).size());
+    fb.positions.task.resize(td.size());
 
     // Feedback errors
-    Eigen::VectorXd::Map(fb.errors.td.data(), std::get<0>(e).size()) = std::get<0>(e);
+    Eigen::VectorXd::Map(fb.errors.task.data(), std::get<0>(e).size()) = std::get<0>(e);
     tf::vectorEigenToMsg(std::get<1>(e), fb.errors.p_trocar);
 
     // Feedback positions
-    Eigen::VectorXd::Map(fb.positions.td.data(), td.size()) = td;
+    Eigen::VectorXd::Map(fb.positions.task.data(), td.size()) = td;
     tf::vectorEigenToMsg(p_trocar, fb.positions.p_trocar);
 
     return fb;
