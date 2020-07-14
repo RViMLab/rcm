@@ -4,6 +4,7 @@ project(rcom_impl)
 # Catkin packages
 find_package(catkin REQUIRED COMPONENTS
     roscpp
+    actionlib
     moveit_ros_planning_interface
     eigen_conversions
     trajectory_msgs
@@ -16,7 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Eigen3 REQUIRED)
 
 catkin_package(
-    CATKIN_DEPENDS roscpp moveit_ros_planning_interface eigen_conversions trajectory_msgs geometry_msgs control_msgs rcom_msgs
+    CATKIN_DEPENDS roscpp actionlib moveit_ros_planning_interface eigen_conversions trajectory_msgs geometry_msgs control_msgs rcom_msgs
     INCLUDE_DIRS include ${catkin_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS}
     DEPENDS EIGEN3
 )
