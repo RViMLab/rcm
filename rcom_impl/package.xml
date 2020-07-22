@@ -13,6 +13,8 @@
   <depend>eigen</depend>
   <depend>moveit_ros_planning_interface</depend>
   <depend>eigen_conversions</depend>
+  <depend>tf_conversions</depend>
+  <depend>tf</depend>
   <depend>trajectory_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>control_msgs</depend>

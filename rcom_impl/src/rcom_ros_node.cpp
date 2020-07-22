@@ -42,6 +42,7 @@ int main(int argc, char** argv) {
     double alpha;
     std::string link_pi, link_pip1;
     double t1_td, t1_p_trocar, t2_td, t2_p_trocar;
+    std::vector<double> t_td_scale;
     int max_iter;
 
     nh.getParam("action_server", action_server);
@@ -55,6 +56,7 @@ int main(int argc, char** argv) {
     nh.getParam("link_pi", link_pi);
     nh.getParam("link_pip1", link_pip1);
     nh.getParam("t1_td", t1_td);
+    nh.getParam("t_td_scale", t_td_scale);
     nh.getParam("t1_p_trocar", t1_p_trocar);
     nh.getParam("t2_td", t2_td);
     nh.getParam("t2_p_trocar", t2_p_trocar);
@@ -64,7 +66,7 @@ int main(int argc, char** argv) {
         nh, action_server, control_client,
         kt, krcm, lambda0, dt,
         planning_group, alpha, link_pi, link_pip1,
-        t1_td, t1_p_trocar, t2_td, t2_p_trocar, max_iter    
+        t1_td, t1_p_trocar, t2_td, t2_p_trocar, t_td_scale, max_iter    
     );
 
     ros::waitForShutdown();

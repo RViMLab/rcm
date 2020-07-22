@@ -25,6 +25,7 @@ class RCoMImpl {
          * @brief eq. 7, see paper
          * 
          * @param td desired task position (Eigen::VectorXd)
+         * @param t current task position (Eigen::VectorXd)
          * @param p_trocar trocar position (Eigen::Vector3d)
          * @param p_i see fig. 1, paper (Eigen::Vector3d)
          * @param p_ip1 see fig. 1, paper (Eigen::Vector3d)
@@ -35,6 +36,7 @@ class RCoMImpl {
         template<typename derived>
         Eigen::VectorXd computeFeedback(
                 Eigen::VectorXd& td, 
+                Eigen::VectorXd& t,
                 Eigen::Vector3d& p_trocar,
                 Eigen::MatrixBase<derived>& p_i,
                 Eigen::MatrixBase<derived>& p_ip1,
@@ -86,8 +88,7 @@ class RCoMImpl {
         // eq. 6 and following, see paper
         Eigen::MatrixXd _computeJacobian(Eigen::MatrixXd& J_t, Eigen::MatrixXd& J_RCM);
 
-        template<typename derived>
-        Eigen::VectorXd _computeError(Eigen::VectorXd& td, Eigen::MatrixBase<derived>& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p);
+        Eigen::VectorXd _computeError(Eigen::VectorXd& td, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p);
 };
 
 
@@ -99,6 +100,7 @@ RCoMImpl::RCoMImpl(Eigen::VectorXd kt, double krcm, double lambda0, double dt) :
 template<typename derived>
 Eigen::VectorXd RCoMImpl::computeFeedback(
         Eigen::VectorXd& td, 
+        Eigen::VectorXd& t,
         Eigen::Vector3d& p_trocar,
         Eigen::MatrixBase<derived>& p_i,
         Eigen::MatrixBase<derived>& p_ip1,
@@ -113,7 +115,7 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
 
         // Compute error
         auto p_rcm = computePRCoM(p_i, p_ip1);
-        auto e_t = _computeError(td, p_ip1, p_trocar, p_rcm);
+        auto e_t = _computeError(td, t, p_trocar, p_rcm);
 
         // Compute feedback dq, eq. 7
         auto J_pseudo_inverse = pseudoinverse(J);
@@ -168,8 +170,7 @@ Eigen::MatrixXd RCoMImpl::_computeJacobian(Eigen::MatrixXd& J_t, Eigen::MatrixXd
 }
 
 
-template<typename derived>
-Eigen::VectorXd RCoMImpl::_computeError(Eigen::VectorXd& td, Eigen::MatrixBase<derived>& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p) {
+Eigen::VectorXd RCoMImpl::_computeError(Eigen::VectorXd& td, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p) {
     auto e_t_upper = td - t;
     auto e_t_lower = p_trocar - p;
 

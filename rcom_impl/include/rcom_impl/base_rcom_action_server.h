@@ -27,7 +27,7 @@ class BaseRCoMActionServer {
             ros::NodeHandle nh, std::string action_server, std::string control_client, 
             std::vector<double> kt, double krcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-            double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, int max_iter
+            double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
         );
 
     protected:
@@ -56,6 +56,7 @@ class BaseRCoMActionServer {
 
         // Error margin and max iterations
         double _t1_td, _t1_p_trocar, _t2_td, _t2_p_trocar;
+        Eigen::VectorXd _t_td_scale;
         int _max_iter;
 
         // Goal callback, state machine
@@ -64,11 +65,14 @@ class BaseRCoMActionServer {
         // Timer callback, publish current state
         void _timerCB(const ros::TimerEvent&);
 
-        // Update remote center of motion with task Jacobian
-        virtual std::vector<double> _computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) = 0;
+        // Compute task Jacobian
+        virtual Eigen::MatrixXd _computeTaskJacobian(moveit::core::RobotStatePtr robot_state) = 0;
 
         // Compute error between current and desired values via forward kinematics
         virtual Eigen::VectorXd _computeTaskForwardKinematics(std::vector<double>& q) = 0;
+
+        // Update joint angles
+        virtual std::vector<double> _computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
 
         std::tuple<Eigen::Vector3d, Eigen::Vector3d> _computeRCoMForwardKinematics(std::vector<double>& q);
 
@@ -92,7 +96,7 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     ros::NodeHandle nh, std::string action_server, std::string control_client, 
     std::vector<double> kt, double krcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-    double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, int max_iter
+    double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
 ) : _action_server(action_server), _as(nh, action_server, boost::bind(&BaseRCoMActionServer::_goalCB, this, _1), false),
     _control_client(control_client), _ac(nh, control_client, false),
     _rcom(Eigen::Map<Eigen::VectorXd>(kt.data(), kt.size()), krcm, lambda0, dt),
@@ -101,7 +105,7 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     _move_group(planning_group),
     _link_pi(link_pi),
     _link_pip1(link_pip1),
-    _t1_td(t1_td), _t1_p_trocar(t1_p_trocar), _t2_td(t2_td), _t2_p_trocar(t2_p_trocar), _max_iter(max_iter) {    
+    _t1_td(t1_td), _t1_p_trocar(t1_p_trocar), _t2_td(t2_td), _t2_p_trocar(t2_p_trocar), _t_td_scale(Eigen::Map<Eigen::VectorXd>(t_td_scale.data(), t_td_scale.size())), _max_iter(max_iter) {    
     
     _as.start();
     _move_group.setMaxVelocityScalingFactor(alpha);
@@ -201,10 +205,56 @@ void BaseRCoMActionServer::_timerCB(const ros::TimerEvent&) {
     msg.task.resize(t.size());
 
     tf::vectorEigenToMsg(prcm, msg.p_trocar);
-    Eigen::Vector3d::Map(msg.task.data(), msg.task.size()) = t;
+    Eigen::VectorXd::Map(msg.task.data(), msg.task.size()) = t;
 
     _state_pub.publish(msg);
 }
+
+
+std::vector<double> BaseRCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) {
+    
+    // Compute Jacobians and positions of robot model at current pose
+    auto robot_state = _move_group.getCurrentState();
+    auto q = _move_group.getCurrentJointValues();
+
+    auto pi = robot_state->getGlobalLinkTransform(_link_pi).translation();
+    auto pip1 = robot_state->getGlobalLinkTransform(_link_pip1).translation();
+
+    Eigen::MatrixXd Ji;
+    Eigen::MatrixXd Jip1;
+
+    robot_state->getJacobian(
+        robot_state->getJointModelGroup(_planning_group),
+        robot_state->getLinkModel(_link_pi),
+        Eigen::Vector3d::Zero(),
+        Ji
+    );
+
+    robot_state->getJacobian(
+        robot_state->getJointModelGroup(_planning_group),
+        robot_state->getLinkModel(_link_pip1),
+        Eigen::Vector3d::Zero(),
+        Jip1
+    );
+
+    Eigen::MatrixXd Jt = _computeTaskJacobian(robot_state);
+    Eigen::VectorXd t = _computeTaskForwardKinematics(q);
+
+    Ji   = Ji.topRows(3);  // get translational part of Jacobian
+    Jip1 = Jip1.topRows(3);
+
+    auto dq = _rcom.computeFeedback(
+        td, t, 
+        p_trocar, pi, pip1,
+        Ji, Jip1, Jt
+    );
+
+    for (int i = 0; i < q.size(); i++) {
+        q[i] += dq[i];
+    }
+
+    return q;
+};
 
 
 std::tuple<Eigen::Vector3d, Eigen::Vector3d> BaseRCoMActionServer::_computeRCoMForwardKinematics(std::vector<double>& q) {
@@ -232,10 +282,11 @@ std::tuple<Eigen::VectorXd, Eigen::Vector3d> BaseRCoMActionServer::_computeError
 ) {
 
     // Compute error
-    auto t1_td = td - t;
-    auto t1_p_trocar = p_trocar - prcm;
+    if (td.size() != _t_td_scale.size()) throw "Size of t_td_scale must equal task dimension!";
+    auto t_td = _t_td_scale.asDiagonal()*(td - t);
+    auto t_p_trocar = p_trocar - prcm;
 
-    return std::make_tuple(t1_td, t1_p_trocar);
+    return std::make_tuple(t_td, t_p_trocar);
 };
 
 

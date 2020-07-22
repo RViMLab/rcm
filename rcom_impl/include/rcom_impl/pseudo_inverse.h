@@ -1,6 +1,6 @@
 #pragma once
 
-#include <eigen3/Eigen/Core>
+#include <Eigen/Core>
 
 
 // taken from https://gist.github.com/javidcf/25066cf85e71105d57b6

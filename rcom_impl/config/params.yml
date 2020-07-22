@@ -3,7 +3,7 @@ control_client: 'PositionJointInterface_trajectory_controller/follow_joint_traje
 planning_group: 'arm_endoscope'
 
 # gains
-kt: [1.0, 1.0, 1.0]
+kt: [1.0, 1.0, 1.0, 1.0]
 krcm: 0.5
 lambda0: 0.5
 
@@ -19,9 +19,14 @@ link_pip1: 'endoscope_link_cm'
 
 # threshold 1
 t1_td: 0.1
-t1_p_trocar: 0.1
+t1_p_trocar: 0.01
 
 # threshold 2
 t2_td: 0.01
 t2_p_trocar: 0.01
+
+# threshold scale
+t_td_scale: [1.0, 1.0, 1.0, 0.1]
+
+# max number of iterations
 max_iter: 20
