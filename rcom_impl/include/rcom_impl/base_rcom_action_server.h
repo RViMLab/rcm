@@ -30,6 +30,8 @@ class BaseRCoMActionServer {
             double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
         );
 
+        ~BaseRCoMActionServer();
+
     protected:
         ros::NodeHandle _nh;
 
@@ -112,6 +114,16 @@ BaseRCoMActionServer::BaseRCoMActionServer(
 
     _timer = nh.createTimer(ros::Duration(dt), &BaseRCoMActionServer::_timerCB, this);
     _state_pub = nh.advertise<rcom_msgs::rcom>(action_server + "/state", 1);
+}
+
+
+BaseRCoMActionServer::~BaseRCoMActionServer() {
+    _nh.shutdown();
+    _as.shutdown();
+    _ac.cancelAllGoals();
+    _timer.stop();
+
+    _state_pub.shutdown();
 }
 
 
