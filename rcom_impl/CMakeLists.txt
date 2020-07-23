@@ -32,7 +32,7 @@ include_directories(
 )
 
 # Executable
-add_executable(rcom_node src/rcom_ros_node.cpp)
+add_executable(rcom_node src/rcom_node.cpp)
 target_link_libraries(rcom_node ${catkin_LIBRARIES})
 
 # Install
