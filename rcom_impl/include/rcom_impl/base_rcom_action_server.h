@@ -320,6 +320,9 @@ template<typename T>
 T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& td, Eigen::Vector3d& p_trocar) {
     T fb;
 
+    fb.errors.task.is_velocity = false;
+    fb.states.task.is_velocity = false;
+
     // Allocate space for mapping
     fb.errors.task.values.resize(std::get<0>(e).size());
     fb.states.task.values.resize(td.size());
