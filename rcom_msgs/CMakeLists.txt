@@ -12,6 +12,10 @@ add_message_files(
     FILES rcom.msg
 )
 
+add_message_files(
+    FILES values.msg
+)
+
 add_action_files(
     FILES rcom.action
 )

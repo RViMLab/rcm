@@ -1,10 +1,10 @@
 # goal definition
-rcom_msgs/rcom positions
+rcom_msgs/rcom states
 ---
 # result definition
-rcom_msgs/rcom positions
+rcom_msgs/rcom states
 rcom_msgs/rcom errors
 ---
 # feedback
-rcom_msgs/rcom positions
+rcom_msgs/rcom states
 rcom_msgs/rcom errors

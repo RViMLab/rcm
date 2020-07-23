@@ -123,8 +123,16 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     Eigen::VectorXd td;        // task
     Eigen::Vector3d p_trocar;  // trocar
 
-    td = Eigen::VectorXd::Map(goal->positions.task.data(), goal->positions.task.size());  // sadly eigen_conversions does not support matrices, of which VectorXd is a special case
-    tf::vectorMsgToEigen(goal->positions.p_trocar, p_trocar);
+    td = Eigen::VectorXd::Map(goal->states.task.values.data(), goal->states.task.values.size());  // sadly eigen_conversions does not support matrices, of which VectorXd is a special case
+    tf::vectorMsgToEigen(goal->states.p_trocar, p_trocar);
+
+    // Handle velocity goal
+    if (goal->states.task.is_velocity) {
+        auto robot_state = _move_group.getCurrentState();
+        auto q = _move_group.getCurrentJointValues();
+        auto t = _computeTaskForwardKinematics(q);
+        td = t + _rcom.getdt()*td;
+    }
 
     if (_as.isPreemptRequested() || !ros::ok()) {
         ROS_INFO("%s: Preempted", _action_server.c_str());
@@ -202,10 +210,10 @@ void BaseRCoMActionServer::_timerCB(const ros::TimerEvent&) {
 
     // Publish current state
     rcom_msgs::rcom msg;
-    msg.task.resize(t.size());
+    msg.task.values.resize(t.size());
 
     tf::vectorEigenToMsg(prcm, msg.p_trocar);
-    Eigen::VectorXd::Map(msg.task.data(), msg.task.size()) = t;
+    Eigen::VectorXd::Map(msg.task.values.data(), msg.task.values.size()) = t;
 
     _state_pub.publish(msg);
 }
@@ -313,16 +321,16 @@ T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vect
     T fb;
 
     // Allocate space for mapping
-    fb.errors.task.resize(std::get<0>(e).size());
-    fb.positions.task.resize(td.size());
+    fb.errors.task.values.resize(std::get<0>(e).size());
+    fb.states.task.values.resize(td.size());
 
     // Feedback errors
-    Eigen::VectorXd::Map(fb.errors.task.data(), std::get<0>(e).size()) = std::get<0>(e);
+    Eigen::VectorXd::Map(fb.errors.task.values.data(), std::get<0>(e).size()) = std::get<0>(e);
     tf::vectorEigenToMsg(std::get<1>(e), fb.errors.p_trocar);
 
     // Feedback positions
-    Eigen::VectorXd::Map(fb.positions.task.data(), td.size()) = td;
-    tf::vectorEigenToMsg(p_trocar, fb.positions.p_trocar);
+    Eigen::VectorXd::Map(fb.states.task.values.data(), td.size()) = td;
+    tf::vectorEigenToMsg(p_trocar, fb.states.p_trocar);
 
     return fb;
 };
