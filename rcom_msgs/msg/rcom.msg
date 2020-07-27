@@ -1,2 +1,2 @@
-rcom_msgs/values task
-geometry_msgs/Vector3 p_trocar
+rcom_msgs/task task
+rcom_msgs/p_trocar p_trocar
