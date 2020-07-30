@@ -73,6 +73,9 @@ class BaseRCoMActionServer {
         // Compute error between current and desired values via forward kinematics
         virtual Eigen::VectorXd _computeTaskForwardKinematics(std::vector<double>& q) = 0;
 
+        // Transform task
+        virtual Eigen::VectorXd _transformTask(Eigen::VectorXd& td);
+
         // Update joint angles
         virtual std::vector<double> _computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
 
@@ -136,7 +139,8 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     Eigen::Vector3d p_trocar;  // trocar
 
     td = Eigen::VectorXd::Map(goal->states.task.values.data(), goal->states.task.values.size());  // sadly eigen_conversions does not support matrices, of which VectorXd is a special case
-    
+    td = _transformTask(td);
+
     // Handle empty trocar positions
     if (goal->states.p_trocar.is_empty) {
         auto robot_state = _move_group.getCurrentState();
@@ -242,6 +246,12 @@ void BaseRCoMActionServer::_timerCB(const ros::TimerEvent&) {
 }
 
 
+Eigen::VectorXd BaseRCoMActionServer::_transformTask(Eigen::VectorXd& td) {
+    // Can be used to transform the task
+    return td;
+}
+
+
 std::vector<double> BaseRCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) {
     
     // Compute Jacobians and positions of robot model at current pose
@@ -313,7 +323,7 @@ std::tuple<Eigen::VectorXd, Eigen::Vector3d> BaseRCoMActionServer::_computeError
 ) {
 
     // Compute error
-    if (td.size() != _t_td_scale.size()) throw "Size of t_td_scale must equal task dimension!";
+    if (td.size() != _t_td_scale.size()) throw std::runtime_error("Size of t_td_scale must equal task dimension!");
     auto t_td = _t_td_scale.asDiagonal()*(td - t);
     auto t_p_trocar = p_trocar - prcm;
 

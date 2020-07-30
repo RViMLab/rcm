@@ -122,7 +122,7 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
 
         int nt = J_t.rows();
         Eigen::MatrixXd K = Eigen::MatrixXd::Zero(3+nt, 3+nt);
-        if (nt != _kt.size()) throw "Size of _kt must equal task dimension!";
+        if (nt != _kt.size()) throw std::runtime_error("Size of _kt must equal task dimension!");
         K.topLeftCorner(nt, nt) = _kt.asDiagonal();
         K.bottomRightCorner(3, 3) = _krcm*Eigen::MatrixXd::Identity(3, 3);
 
