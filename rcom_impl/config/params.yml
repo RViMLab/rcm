@@ -1,4 +1,4 @@
-action_server: 'RCoM_ActionServer'
+action_server: 'rcom/RCoM_ActionServer'
 control_client: 'PositionJointInterface_trajectory_controller/follow_joint_trajectory'
 planning_group: 'arm_endoscope'
 
