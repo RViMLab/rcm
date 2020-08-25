@@ -1,10 +1,10 @@
 # Remote Center of Motion
-Implementation of 'Task Control with Remote Center of Motion Constraint for Minimally Invasive Robotic Surgery' Aghakhani et al. with ROS and Moveit! integration. 
+Implementation of [Task Control with Remote Center of Motion Constraint for Minimally Invasive Robotic Surgery](https://ieeexplore.ieee.org/abstract/document/6631412?casa_token=2dfBz_G3vPoAAAAA:BwZvpCcLNtu8vhJQOkqPDvdDlvFbUEjcC8aXuTqRln92TV7RuOctKLwy2Sk_o1WBWxO89QWY) Aghakhani et al. with ROS and Moveit! integration. 
 
 ## Overview
 Two classes provide functionallity
 
- - [RCoMImpl](rcom_impl/include/rcom_impl/rcom_impl.h), computes joint angle updates under control law presented in paper
+ - [RCoMImpl](rcom_impl/include/rcom_impl/rcom_impl.h), computes joint angle updates under the control law presented in the paper
 
  - [RCoMActionServer](rcom_impl/include/rcom_impl/rcom_action_server.h), has a [RCoMImpl](rcom_impl/include/rcom_impl/rcom_impl.h) and implements a state machine that communicates to ROS via an action client
 
