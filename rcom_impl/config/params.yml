@@ -14,8 +14,8 @@ dt: 0.1
 alpha: 1.0
 
 # link names
-link_pi: 'da_vinci_endoscope_link_1'
-link_pip1: 'da_vinci_endoscope_link_cm'
+link_pi: 'storz_endoscope_link_1'
+link_pip1: 'storz_endoscope_link_cm'
 
 # threshold 1
 t1_td: 0.1
