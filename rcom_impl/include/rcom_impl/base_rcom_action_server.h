@@ -93,7 +93,7 @@ class BaseRCoMActionServer {
 
         // Compute goal feedback and result
         template<typename T>
-        T _computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& td, Eigen::Vector3d& p_trocar);
+        T _computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar);
 };
 
 
@@ -198,13 +198,13 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
 
                 if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
                     ROS_INFO("%s: Suceeded", _action_server.c_str());
-                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm); // TODO: raplace by task
+                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
                     _as.setSucceeded(rs);
                     update = false;
                 }
                 else {
                     ROS_INFO("%s: Iterating on joint angles", _action_server.c_str());
-                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm); // TODO: raplace by task
+                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
                     _as.publishFeedback(fb);
 
                     if (iter > _max_iter) {
@@ -350,7 +350,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_executeGoal(std::vector<
 
 
 template<typename T>
-T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& td, Eigen::Vector3d& p_trocar) {
+T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar) {
     T fb;
 
     fb.errors.task.is_velocity = false;
@@ -361,14 +361,14 @@ T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vect
 
     // Allocate space for mapping
     fb.errors.task.values.resize(std::get<0>(e).size());
-    fb.states.task.values.resize(td.size());
+    fb.states.task.values.resize(t.size());
 
     // Feedback errors
     Eigen::VectorXd::Map(fb.errors.task.values.data(), std::get<0>(e).size()) = std::get<0>(e);
     tf::vectorEigenToMsg(std::get<1>(e), fb.errors.p_trocar.position);
 
     // Feedback positions
-    Eigen::VectorXd::Map(fb.states.task.values.data(), td.size()) = td;
+    Eigen::VectorXd::Map(fb.states.task.values.data(), t.size()) = t;
     tf::vectorEigenToMsg(p_trocar, fb.states.p_trocar.position);
 
     return fb;
