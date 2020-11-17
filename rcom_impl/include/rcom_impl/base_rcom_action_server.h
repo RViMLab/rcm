@@ -207,13 +207,12 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
                     _as.publishFeedback(fb);
 
-                    if (iter > _max_iter) {
+                    iter++;
+                    if (iter >= _max_iter) {
                         ROS_INFO("%s: Aborted due to max_iter", _action_server.c_str());
                         _as.setAborted();
                         update = false;
                     }
-
-                    iter++;
                 }
             }
             else {
