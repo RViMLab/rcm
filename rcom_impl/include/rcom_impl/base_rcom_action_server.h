@@ -184,41 +184,35 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
             update = false;
         }
         else {
-            auto status = _executeGoal(q);
+            _executeGoal(q);
 
-            if (status == actionlib::SimpleClientGoalState::SUCCEEDED) {
-                q = _move_group.getCurrentJointValues();
-                p = _computeRCoMForwardKinematics(q);
-                prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
-                t = _computeTaskForwardKinematics(q);
-                e = _computeError(td, t, p_trocar, prcm);
+            // Perform checks
+            q = _move_group.getCurrentJointValues();
+            p = _computeRCoMForwardKinematics(q);
+            prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+            t = _computeTaskForwardKinematics(q);
+            e = _computeError(td, t, p_trocar, prcm);
 
-                // Update lambda to remove drift
-                _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
+            // Update lambda to remove drift
+            _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
-                if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
-                    ROS_INFO("%s: Suceeded", _action_server.c_str());
-                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
-                    _as.setSucceeded(rs);
-                    update = false;
-                }
-                else {
-                    ROS_INFO("%s: Iterating on joint angles", _action_server.c_str());
-                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
-                    _as.publishFeedback(fb);
-
-                    iter++;
-                    if (iter >= _max_iter) {
-                        ROS_INFO("%s: Aborted due to max_iter", _action_server.c_str());
-                        _as.setAborted();
-                        update = false;
-                    }
-                }
+            if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
+                ROS_INFO("%s: Suceeded", _action_server.c_str());
+                auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
+                _as.setSucceeded(rs);
+                update = false;
             }
             else {
-                ROS_INFO("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
-                _as.setAborted();
-                update = false;
+                ROS_INFO("%s: Iterating on joint angles", _action_server.c_str());
+                auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
+                _as.publishFeedback(fb);
+
+                iter++;
+                if (iter >= _max_iter) {
+                    ROS_INFO("%s: Aborted due to max_iter", _action_server.c_str());
+                    _as.setAborted();
+                    update = false;
+                }
             }
         }
     }
@@ -342,7 +336,6 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_executeGoal(std::vector<
     goal.trajectory.points.push_back(point);
 
     _ac.sendGoal(goal);
-    _ac.waitForResult();
 
     return _ac.getState();
 };
