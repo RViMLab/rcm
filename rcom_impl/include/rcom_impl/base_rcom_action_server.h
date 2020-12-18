@@ -189,19 +189,19 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
                     _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
                 if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
-                    ROS_INFO("%s: Suceeded, prcm: (%f, %f, ,%f), p_trocar: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], p_trocar[0], p_trocar[1], p_trocar[2]);
+                    ROS_INFO("%s: Suceeded, prcm: (%f, %f, ,%f), pip1: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2]);
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
                     _as.setSucceeded(rs);
                     update = false;
                 }
                 else {
-                    ROS_INFO("%s: Iterating on joint angles, prcm: (%f, %f, ,%f), p_trocar: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], p_trocar[0], p_trocar[1], p_trocar[2]);
+                    ROS_INFO("%s: Iterating on joint angles, prcm: (%f, %f, ,%f), pip1: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2]);
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
                     _as.publishFeedback(fb);
 
                     iter++;
                     if (iter >= _max_iter) {
-                        ROS_INFO("%s: Aborted due to max_iter, prcm: (%f, %f, ,%f), p_trocar: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], p_trocar[0], p_trocar[1], p_trocar[2]);
+                        ROS_INFO("%s: Aborted due to max_iter, prcm: (%f, %f, ,%f), pip1: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2]);
                         _as.setAborted();
                         update = false;
                     }
