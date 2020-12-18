@@ -53,6 +53,9 @@ int main(int argc, char** argv) {
     // Set an initial pose, corresponding to p_trocar
     auto joint_values = move_group.getCurrentJointValues();
 
+    // joint_values[1] -= 1.0*M_PI/4.;
+    // joint_values[3] -= 2.0*M_PI/4.;
+    // joint_values[5] += 1.0*M_PI/4.;
     joint_values[1] -= 1.0*M_PI/4.;
     joint_values[2] -= 1.0*M_PI/4.;
     joint_values[3] += 2.0*M_PI/4.;
