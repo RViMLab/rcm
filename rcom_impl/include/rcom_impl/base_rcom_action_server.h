@@ -141,16 +141,8 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     td = Eigen::VectorXd::Map(goal->states.task.values.data(), goal->states.task.values.size());  // sadly eigen_conversions does not support matrices, of which VectorXd is a special case
     td = _transformTask(td);
 
-    // Handle empty trocar positions
-    if (goal->states.p_trocar.is_empty) {
-        auto robot_state = _move_group.getCurrentState();
-        auto q = _move_group.getCurrentJointValues();
-        auto p = _computeRCoMForwardKinematics(q);
-        p_trocar = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
-    }
-    else {
-        tf::vectorMsgToEigen(goal->states.p_trocar.position, p_trocar);
-    }
+    // Read trocar position
+    tf::vectorMsgToEigen(goal->states.p_trocar.position, p_trocar);
 
     // Handle velocity goal
     if (goal->states.task.is_velocity) {
@@ -197,19 +189,19 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
                     _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
                 if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
-                    ROS_INFO("%s: Suceeded", _action_server.c_str());
+                    ROS_INFO("%s: Suceeded, prcm: (%f, %f, ,%f), p_trocar: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], p_trocar[0], p_trocar[1], p_trocar[2]);
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
                     _as.setSucceeded(rs);
                     update = false;
                 }
                 else {
-                    ROS_INFO("%s: Iterating on joint angles", _action_server.c_str());
+                    ROS_INFO("%s: Iterating on joint angles, prcm: (%f, %f, ,%f), p_trocar: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], p_trocar[0], p_trocar[1], p_trocar[2]);
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
                     _as.publishFeedback(fb);
 
                     iter++;
                     if (iter >= _max_iter) {
-                        ROS_INFO("%s: Aborted due to max_iter", _action_server.c_str());
+                        ROS_INFO("%s: Aborted due to max_iter, prcm: (%f, %f, ,%f), p_trocar: (%f, %f, %f)", _action_server.c_str(), prcm[0], prcm[1], prcm[2], p_trocar[0], p_trocar[1], p_trocar[2]);
                         _as.setAborted();
                         update = false;
                     }
@@ -236,7 +228,6 @@ void BaseRCoMActionServer::_timerCB(const ros::TimerEvent&) {
     // Publish current state
     rcom_msgs::rcom msg;
     msg.task.values.resize(t.size());
-    msg.p_trocar.is_empty = false;
 
     tf::vectorEigenToMsg(prcm, msg.p_trocar.position);
     Eigen::VectorXd::Map(msg.task.values.data(), msg.task.values.size()) = t;
@@ -354,9 +345,6 @@ T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vect
 
     fb.errors.task.is_velocity = false;
     fb.states.task.is_velocity = false;
-
-    fb.errors.p_trocar.is_empty = false;
-    fb.states.p_trocar.is_empty = false;
 
     // Allocate space for mapping
     fb.errors.task.values.resize(std::get<0>(e).size());
