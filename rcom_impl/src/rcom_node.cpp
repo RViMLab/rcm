@@ -43,7 +43,7 @@ int main(int argc, char** argv) {
 
     // Initialize position
     auto move_group = moveit::planning_interface::MoveGroupInterface(planning_group);
-    move_group.setMaxVelocityScalingFactor(0.01);
+    move_group.setMaxVelocityScalingFactor(1.0);
 
     // Go home
     move_group.setNamedTarget("home");
@@ -56,12 +56,21 @@ int main(int argc, char** argv) {
     // joint_values[1] -= 1.0*M_PI/4.;
     // joint_values[3] -= 2.0*M_PI/4.;
     // joint_values[5] += 1.0*M_PI/4.;
-    joint_values[1] -= 1.0*M_PI/4.;
-    joint_values[2] -= 1.0*M_PI/4.;
-    joint_values[3] += 2.0*M_PI/4.;
-    joint_values[4] -= 1.0*M_PI/4.;
-    joint_values[5] -= 1.0*M_PI/4.;
-    joint_values[6] -= 1.0*M_PI/4.;
+
+    joint_values[1] = 1.0*M_PI/4.;
+    joint_values[2] = 1.0*M_PI/4.;
+    joint_values[3] = 2.0*M_PI/4.;
+    joint_values[4] = 1.0*M_PI/4.;
+    joint_values[5] = 1.0*M_PI/4.;
+    joint_values[6] = 1.0*M_PI/4.;
+
+    // joint_values[0]  =   79.39*M_PI/180.;
+    // joint_values[1]  =   61.37*M_PI/180.;
+    // joint_values[2]  = -  9.22*M_PI/180.;
+    // joint_values[3]  = - 48.82*M_PI/180.;
+    // joint_values[4]  =   64.70*M_PI/180.;
+    // joint_values[5]  =   51.18*M_PI/180.;
+    // joint_values[6]  = -  5.06*M_PI/180.;
 
     move_group.setJointValueTarget(joint_values);
     move_group.move();
