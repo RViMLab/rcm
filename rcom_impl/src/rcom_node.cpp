@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
 
     // Parameters
     std::string action_server, control_client;
-    std::vector<double> kt, krcm;
+    std::vector<double> kpt, kit, kdt, krcm;
     double lambda0, dt;
     std::string planning_group;
     double alpha;
@@ -26,7 +26,9 @@ int main(int argc, char** argv) {
 
     nh.getParam("action_server", action_server);
     nh.getParam("control_client", control_client);
-    nh.getParam("kt", kt);
+    nh.getParam("kpt", kpt);
+    nh.getParam("kit", kit);
+    nh.getParam("kdt", kdt);
     nh.getParam("krcm", krcm);
     nh.getParam("lambda0", lambda0);
     nh.getParam("dt", dt);
@@ -80,7 +82,7 @@ int main(int argc, char** argv) {
     // Action server
     rcom::RCoMActionServer rcom_as(
         nh, action_server, control_client,
-        kt, krcm, lambda0, dt,
+        kpt, kit, kdt, krcm, lambda0, dt,
         planning_group, alpha, link_pi, link_pip1,
         t1_td, t1_p_trocar, t2_td, t2_p_trocar, t_td_scale, max_iter    
     );

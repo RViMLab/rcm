@@ -3,7 +3,9 @@ control_client: 'PositionJointInterface_trajectory_controller/follow_joint_traje
 planning_group: 'arm_endoscope'
 
 # gains
-kt: [0.1,0.1,0.1,0.1]
+kpt: [0.1,0.1,0.1,0.1]
+kit: [0.0,0.0,0.0,0.0]
+kdt: [0.0,0.0,0.0,0.0]
 krcm: [0.2, 0.2, 0.2]
 lambda0: 0.5
 
