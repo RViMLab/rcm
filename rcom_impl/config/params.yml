@@ -3,12 +3,12 @@ control_client: 'PositionJointInterface_trajectory_controller/follow_joint_traje
 planning_group: 'arm_endoscope'
 
 # gains
-kt: [1.0, 1.0, 1.0, 1.0]
-krcm: 4.0
+kt: [0.1,0.1,0.1,0.1]
+krcm: [0.2, 0.2, 0.2]
 lambda0: 0.5
 
 # control interval
-dt: 0.1
+dt: 0.01
 
 # velocity scaling
 alpha: 1.0

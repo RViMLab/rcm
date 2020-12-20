@@ -25,7 +25,7 @@ class BaseRCoMActionServer {
     public:
         BaseRCoMActionServer(
             ros::NodeHandle nh, std::string action_server, std::string control_client, 
-            std::vector<double> kt, double krcm, double lambda0, double dt, 
+            std::vector<double> kt, std::vector<double> krcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
             double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
         );
@@ -99,12 +99,12 @@ class BaseRCoMActionServer {
 
 BaseRCoMActionServer::BaseRCoMActionServer(
     ros::NodeHandle nh, std::string action_server, std::string control_client, 
-    std::vector<double> kt, double krcm, double lambda0, double dt, 
+    std::vector<double> kt, std::vector<double> krcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
     double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
 ) : _action_server(action_server), _as(nh, action_server, boost::bind(&BaseRCoMActionServer::_goalCB, this, _1), false),
     _control_client(control_client), _ac(nh, control_client, false),
-    _rcom(Eigen::Map<Eigen::VectorXd>(kt.data(), kt.size()), krcm, lambda0, dt),
+    _rcom(Eigen::Map<Eigen::VectorXd>(kt.data(), kt.size()), Eigen::Map<Eigen::VectorXd>(krcm.data(), krcm.size()), lambda0, dt),
     _planning_group(planning_group),
     _alpha(alpha),
     _move_group(planning_group),
@@ -152,16 +152,17 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
         td = t + _rcom.getdt()*td;
     }
 
-    if (_as.isPreemptRequested() || !ros::ok()) {
-        ROS_INFO("%s: Preempted", _action_server.c_str());
-        _as.setPreempted();
-        update = false;
-    }
-
     int iter = 0;
 
     // State machine
     while (update) {
+
+        if (_as.isPreemptRequested() || !ros::ok()) {
+            ROS_INFO("%s: Preempted", _action_server.c_str());
+            _as.setPreempted();
+            update = false;
+            break;
+        }
 
         // Compute joint angles that satisfy desired positions
         auto q = _computeUpdate(td, p_trocar);

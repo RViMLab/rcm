@@ -13,13 +13,13 @@ namespace rcom {
  *        https://ieeexplore.ieee.org/document/6631412
  * 
  * @param kt trajectory gain (Eigen::VectorXd)
- * @param krcm remote center of motion gain (double)
+ * @param krcm remote center of motion gain (Eigen::VectorXd)
  * @param lambda0 initial relative remote center of motion position (double)
  * @param dt control interval in seconds (double)
 **/
 class RCoMImpl {
     public:
-        RCoMImpl(Eigen::VectorXd kt, double krcm=1., double lambda0=1.0, double dt=0.1);
+        RCoMImpl(Eigen::VectorXd kt, Eigen::VectorXd krcm, double lambda0=1.0, double dt=0.1);
 
         /**
          * @brief eq. 7, see paper
@@ -72,7 +72,7 @@ class RCoMImpl {
 
         // gains eq. 7, see paper
         Eigen::VectorXd _kt;
-        double _krcm;
+        Eigen::VectorXd _krcm;
 
         // eq. 1, see paper
         double _lambda0;
@@ -93,7 +93,7 @@ class RCoMImpl {
 
 
 // Define functions in header due to templates
-RCoMImpl::RCoMImpl(Eigen::VectorXd kt, double krcm, double lambda0, double dt) : _kt(kt), _krcm(krcm), _lambda0(lambda0), _lambda(_lambda0), _dt(dt) {   }
+RCoMImpl::RCoMImpl(Eigen::VectorXd kt, Eigen::VectorXd krcm, double lambda0, double dt) : _kt(kt), _krcm(krcm), _lambda0(lambda0), _lambda(_lambda0), _dt(dt) {   }
 
 
 // eq.7, see paper
@@ -122,9 +122,10 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
 
         int nt = J_t.rows();
         Eigen::MatrixXd K = Eigen::MatrixXd::Zero(3+nt, 3+nt);
-        if (nt != _kt.size()) throw std::runtime_error("Size of _kt must equal task dimension!");
+        if (nt != _kt.size())  throw std::runtime_error("Size of _kt must equal task dimension!");
+        if (3 != _krcm.size()) throw std::runtime_error("Size of _krcm must equal 3!");
         K.topLeftCorner(nt, nt) = _kt.asDiagonal();
-        K.bottomRightCorner(3, 3) = _krcm*Eigen::MatrixXd::Identity(3, 3);
+        K.bottomRightCorner(3, 3) = _krcm.asDiagonal();
 
         auto dq = J_pseudo_inverse*K*e_t;
 

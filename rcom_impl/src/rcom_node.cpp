@@ -15,8 +15,8 @@ int main(int argc, char** argv) {
 
     // Parameters
     std::string action_server, control_client;
-    std::vector<double> kt;
-    double krcm, lambda0, dt;
+    std::vector<double> kt, krcm;
+    double lambda0, dt;
     std::string planning_group;
     double alpha;
     std::string link_pi, link_pip1;
@@ -53,24 +53,24 @@ int main(int argc, char** argv) {
     // Set an initial pose, corresponding to p_trocar
     auto joint_values = move_group.getCurrentJointValues();
 
-    // joint_values[1] -= 1.0*M_PI/4.;
-    // joint_values[3] -= 2.0*M_PI/4.;
-    // joint_values[5] += 1.0*M_PI/4.;
+    joint_values[1] = -1.0*M_PI/4.;
+    joint_values[3] = -2.0*M_PI/2.;
+    joint_values[5] = +1.0*M_PI/4.;
 
-    joint_values[1] = 1.0*M_PI/4.;
-    joint_values[2] = 1.0*M_PI/4.;
-    joint_values[3] = 2.0*M_PI/4.;
-    joint_values[4] = 1.0*M_PI/4.;
-    joint_values[5] = 1.0*M_PI/4.;
-    joint_values[6] = 1.0*M_PI/4.;
+    // joint_values[1] = 1.0*M_PI/4.;
+    // joint_values[2] = 1.0*M_PI/4.;
+    // joint_values[3] = 2.0*M_PI/4.;
+    // joint_values[4] = 1.0*M_PI/4.;
+    // joint_values[5] = 1.0*M_PI/4.;
+    // joint_values[6] = 1.0*M_PI/4.;
 
-    // joint_values[0]  =   79.39*M_PI/180.;
-    // joint_values[1]  =   61.37*M_PI/180.;
-    // joint_values[2]  = -  9.22*M_PI/180.;
-    // joint_values[3]  = - 48.82*M_PI/180.;
-    // joint_values[4]  =   64.70*M_PI/180.;
-    // joint_values[5]  =   51.18*M_PI/180.;
-    // joint_values[6]  = -  5.06*M_PI/180.;
+    // joint_values[0]  =   58.67*M_PI/180.;
+    // joint_values[1]  =   51.53*M_PI/180.;
+    // joint_values[2]  =   10.87*M_PI/180.;
+    // joint_values[3]  = - 77.50*M_PI/180.;
+    // joint_values[4]  =   61.94*M_PI/180.;
+    // joint_values[5]  = - 22.29*M_PI/180.;
+    // joint_values[6]  =   81.79*M_PI/180.;
 
     move_group.setJointValueTarget(joint_values);
     move_group.move();
