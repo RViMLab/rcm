@@ -106,8 +106,8 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     _control_client(control_client), _ac(nh, control_client, false),
     _rcom(
         Eigen::Map<Eigen::VectorXd>(kpt.data(), kpt.size()), 
-        Eigen::Map<Eigen::VectorXd>(kpt.data(), kpt.size()), 
-        Eigen::Map<Eigen::VectorXd>(kpt.data(), kpt.size()), 
+        Eigen::Map<Eigen::VectorXd>(kit.data(), kit.size()), 
+        Eigen::Map<Eigen::VectorXd>(kdt.data(), kdt.size()), 
         Eigen::Map<Eigen::VectorXd>(krcm.data(), krcm.size()), 
         lambda0, dt
     ),
