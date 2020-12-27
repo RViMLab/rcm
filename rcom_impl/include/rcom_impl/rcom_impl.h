@@ -2,6 +2,7 @@
 
 #include <exception>
 #include <eigen3/Eigen/Core>
+#include <tuple>
 
 #include <rcom_impl/pseudo_inverse.h>
 
@@ -90,6 +91,10 @@ class RCoMImpl {
         double _lambda0;
         double _lambda; 
 
+        // integral and differential errors, not in paper
+        Eigen::VectorXd ei_;
+        Eigen::VectorXd eprev_;
+
         // Control interval
         double _dt;
 
@@ -100,7 +105,7 @@ class RCoMImpl {
         // eq. 6 and following, see paper
         Eigen::MatrixXd _computeJacobian(Eigen::MatrixXd& J_t, Eigen::MatrixXd& J_RCM);
 
-        Eigen::VectorXd _computeError(Eigen::VectorXd& td, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p);
+        std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd> _computeError(Eigen::VectorXd& td, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p);
 };
 
 
@@ -131,23 +136,32 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
 
         // Compute error
         auto p_rcm = computePRCoM(p_i, p_ip1);
-        auto e_t = _computeError(td, t, p_trocar, p_rcm);
+        auto e = _computeError(td, t, p_trocar, p_rcm);
+        auto ep = std::get<0>(e);
+        auto ei = std::get<1>(e);
+        auto ed = std::get<2>(e);
 
         // Compute feedback dq, eq. 7
         auto J_pseudo_inverse = pseudoinverse(J);
 
         int nt = J_t.rows();
-        Eigen::MatrixXd K = Eigen::MatrixXd::Zero(3+nt, 3+nt);
+        Eigen::MatrixXd Kp = Eigen::MatrixXd::Zero(3+nt, 3+nt);
+        Eigen::MatrixXd Ki = Eigen::MatrixXd::Zero(3+nt, 3+nt);
+        Eigen::MatrixXd Kd = Eigen::MatrixXd::Zero(3+nt, 3+nt);
         if (nt != _kpt.size()) throw std::runtime_error("Size of _kpt must equal task dimension!");
         if (nt != _kit.size()) throw std::runtime_error("Size of _kit must equal task dimension!");
         if (nt != _kdt.size()) throw std::runtime_error("Size of _kdt must equal task dimension!");
         if (3 != _kprcm.size()) throw std::runtime_error("Size of _kprcm must equal 3!");
         if (3 != _kircm.size()) throw std::runtime_error("Size of _kircm must equal 3!");
         if (3 != _kdrcm.size()) throw std::runtime_error("Size of _kdrcm must equal 3!");
-        K.topLeftCorner(nt, nt) = _kpt.asDiagonal();
-        K.bottomRightCorner(3, 3) = _kprcm.asDiagonal();
+        Kp.topLeftCorner(nt, nt) = _kpt.asDiagonal();
+        Ki.topLeftCorner(nt, nt) = _kit.asDiagonal();
+        Kd.topLeftCorner(nt, nt) = _kdt.asDiagonal();
+        Kp.bottomRightCorner(3, 3) = _kprcm.asDiagonal();
+        Ki.bottomRightCorner(3, 3) = _kircm.asDiagonal();
+        Kd.bottomRightCorner(3, 3) = _kdrcm.asDiagonal();
 
-        auto dq = J_pseudo_inverse*K*e_t;  // TODO: add other gains here
+        auto dq = J_pseudo_inverse*(Kp*ep + Ki*ei + Kd*ed);
 
         // Update lambda
         _lambda += _dt*dq[dq.size() - 1];
@@ -191,13 +205,31 @@ Eigen::MatrixXd RCoMImpl::_computeJacobian(Eigen::MatrixXd& J_t, Eigen::MatrixXd
 }
 
 
-Eigen::VectorXd RCoMImpl::_computeError(Eigen::VectorXd& td, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p) {
-    auto e_t_upper = td - t;
-    auto e_t_lower = p_trocar - p;
+std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd> RCoMImpl::_computeError(Eigen::VectorXd& td, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p) {
+    auto e_upper = td - t;
+    auto e_lower = p_trocar - p;
 
-    Eigen::VectorXd e_t(e_t_upper.rows() + e_t_lower.rows());
-    e_t << e_t_upper, e_t_lower;
-    return e_t;
+    Eigen::VectorXd ep(e_upper.rows() + e_lower.rows());
+    Eigen::VectorXd ei(e_upper.rows() + e_lower.rows());
+    Eigen::VectorXd ed(e_upper.rows() + e_lower.rows());
+    ep << e_upper, e_lower;
+
+    if (ep.size() != ei_.size()) {
+        ei_.resize(ep.size());
+        ei_.setZero();
+    };
+    if (ep.size() != eprev_.size()) {
+        eprev_.resize(ep.size());
+        eprev_.setZero();
+    };
+
+    // compute integral and differential errors
+    ei_ += ep;
+    ei = ei_;
+    ed = ep - eprev_;
+    eprev_ = ep;
+
+    return std::make_tuple(ep, ei, ed);
 }
 
 } // end of namespace rcom

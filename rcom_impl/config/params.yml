@@ -3,10 +3,10 @@ control_client: 'PositionJointInterface_trajectory_controller/follow_joint_traje
 planning_group: 'arm_endoscope'
 
 # task and remote center of motion gains - proportional, integral, differential
-kpt: [0.1,0.1,0.1,0.1]
+kpt: [1.0,1.0,1.0,1.0]
 kit: [0.0,0.0,0.0,0.0]
 kdt: [0.0,0.0,0.0,0.0]
-kprcm: [0.2, 0.2, 0.2]
+kprcm: [10.0, 10.0, 10.0]
 kircm: [0.0, 0.0, 0.0]
 kdrcm: [0.0, 0.0, 0.0]
 lambda0: 0.5
@@ -23,11 +23,11 @@ link_pip1: 'storz_endoscope_link_cm'
 
 # threshold 1, divergence check prior to execution
 t1_td: 0.1
-t1_p_trocar: 0.01
+t1_p_trocar: 1.
 
 # threshold 2, convergence check after execution
-t2_td: 0.001
-t2_p_trocar: 0.01
+t2_td: 0.0001
+t2_p_trocar: 0.0001
 
 # threshold scale
 t_td_scale: [1.0, 1.0, 1.0, 0.1]
