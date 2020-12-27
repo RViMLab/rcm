@@ -15,13 +15,19 @@ namespace rcom {
  * @param kpt task proportional gain (Eigen::VectorXd)
  * @param kit task integral gain (Eigen::VectorXd)
  * @param kdt task differential gain (Eigen::VectorXd)
- * @param krcm remote center of motion gain (Eigen::VectorXd)
+ * @param kprcm remote center of motion proportional gain (Eigen::VectorXd)
+ * @param kircm remote center of motion integral gain (Eigen::VectorXd)
+ * @param kdrcm remote center of motion differential gain (Eigen::VectorXd)
  * @param lambda0 initial relative remote center of motion position (double)
  * @param dt control interval in seconds (double)
 **/
 class RCoMImpl {
     public:
-        RCoMImpl(Eigen::VectorXd kpt, Eigen::VectorXd kit, Eigen::VectorXd kdt, Eigen::VectorXd krcm, double lambda0=1.0, double dt=0.1);
+        RCoMImpl(
+            Eigen::VectorXd kpt, Eigen::VectorXd kit, Eigen::VectorXd kdt,
+            Eigen::VectorXd kprcm, Eigen::VectorXd kircm, Eigen::VectorXd kdrcm, 
+            double lambda0=1.0, double dt=0.1
+        );
 
         /**
          * @brief eq. 7, see paper
@@ -76,7 +82,9 @@ class RCoMImpl {
         Eigen::VectorXd _kpt;
         Eigen::VectorXd _kit;  // not in paper
         Eigen::VectorXd _kdt;  // not in paper
-        Eigen::VectorXd _krcm;
+        Eigen::VectorXd _kprcm;
+        Eigen::VectorXd _kircm;  // not in paper
+        Eigen::VectorXd _kdrcm;  // not in paper
 
         // eq. 1, see paper
         double _lambda0;
@@ -97,8 +105,11 @@ class RCoMImpl {
 
 
 // Define functions in header due to templates
-RCoMImpl::RCoMImpl(Eigen::VectorXd kpt, Eigen::VectorXd kit, Eigen::VectorXd kdt, Eigen::VectorXd krcm, double lambda0, double dt) 
-    : _kpt(kpt), _kit(kit), _kdt(kdt), _krcm(krcm), _lambda0(lambda0), _lambda(_lambda0), _dt(dt) {   }
+RCoMImpl::RCoMImpl(
+    Eigen::VectorXd kpt, Eigen::VectorXd kit, Eigen::VectorXd kdt,
+    Eigen::VectorXd kprcm, Eigen::VectorXd kircm, Eigen::VectorXd kdrcm, 
+    double lambda0, double dt)
+    : _kpt(kpt), _kit(kit), _kdt(kdt), _kprcm(kprcm), _kircm(kircm), _kdrcm(kdrcm), _lambda0(lambda0), _lambda(_lambda0), _dt(dt) {   }
 
 
 // eq.7, see paper
@@ -130,9 +141,11 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         if (nt != _kpt.size()) throw std::runtime_error("Size of _kpt must equal task dimension!");
         if (nt != _kit.size()) throw std::runtime_error("Size of _kit must equal task dimension!");
         if (nt != _kdt.size()) throw std::runtime_error("Size of _kdt must equal task dimension!");
-        if (3 != _krcm.size()) throw std::runtime_error("Size of _krcm must equal 3!");
+        if (3 != _kprcm.size()) throw std::runtime_error("Size of _kprcm must equal 3!");
+        if (3 != _kircm.size()) throw std::runtime_error("Size of _kircm must equal 3!");
+        if (3 != _kdrcm.size()) throw std::runtime_error("Size of _kdrcm must equal 3!");
         K.topLeftCorner(nt, nt) = _kpt.asDiagonal();
-        K.bottomRightCorner(3, 3) = _krcm.asDiagonal();
+        K.bottomRightCorner(3, 3) = _kprcm.asDiagonal();
 
         auto dq = J_pseudo_inverse*K*e_t;  // TODO: add other gains here
 

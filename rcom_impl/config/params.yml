@@ -2,11 +2,13 @@ action_server: 'rcom/RCoM_ActionServer'
 control_client: 'PositionJointInterface_trajectory_controller/follow_joint_trajectory'
 planning_group: 'arm_endoscope'
 
-# gains
+# task and remote center of motion gains - proportional, integral, differential
 kpt: [0.1,0.1,0.1,0.1]
 kit: [0.0,0.0,0.0,0.0]
 kdt: [0.0,0.0,0.0,0.0]
-krcm: [0.2, 0.2, 0.2]
+kprcm: [0.2, 0.2, 0.2]
+kircm: [0.0, 0.0, 0.0]
+kdrcm: [0.0, 0.0, 0.0]
 lambda0: 0.5
 
 # control interval

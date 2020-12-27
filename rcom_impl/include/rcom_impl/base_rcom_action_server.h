@@ -25,7 +25,8 @@ class BaseRCoMActionServer {
     public:
         BaseRCoMActionServer(
             ros::NodeHandle nh, std::string action_server, std::string control_client, 
-            std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt, std::vector<double> krcm, double lambda0, double dt, 
+            std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt,
+            std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
             double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
         );
@@ -99,7 +100,8 @@ class BaseRCoMActionServer {
 
 BaseRCoMActionServer::BaseRCoMActionServer(
     ros::NodeHandle nh, std::string action_server, std::string control_client, 
-    std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt, std::vector<double> krcm, double lambda0, double dt, 
+    std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt,
+    std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
     double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
 ) : _action_server(action_server), _as(nh, action_server, boost::bind(&BaseRCoMActionServer::_goalCB, this, _1), false),
@@ -108,7 +110,9 @@ BaseRCoMActionServer::BaseRCoMActionServer(
         Eigen::Map<Eigen::VectorXd>(kpt.data(), kpt.size()), 
         Eigen::Map<Eigen::VectorXd>(kit.data(), kit.size()), 
         Eigen::Map<Eigen::VectorXd>(kdt.data(), kdt.size()), 
-        Eigen::Map<Eigen::VectorXd>(krcm.data(), krcm.size()), 
+        Eigen::Map<Eigen::VectorXd>(kprcm.data(), kprcm.size()), 
+        Eigen::Map<Eigen::VectorXd>(kircm.data(), kircm.size()), 
+        Eigen::Map<Eigen::VectorXd>(kdrcm.data(), kdrcm.size()), 
         lambda0, dt
     ),
     _planning_group(planning_group),
