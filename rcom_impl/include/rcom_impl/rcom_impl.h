@@ -92,8 +92,8 @@ class RCoMImpl {
         double _lambda; 
 
         // integral and differential errors, not in paper
-        Eigen::VectorXd ei_;
-        Eigen::VectorXd eprev_;
+        Eigen::VectorXd _ei;
+        Eigen::VectorXd _eprev;
 
         // Control interval
         double _dt;
@@ -214,20 +214,20 @@ std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd> RCoMImpl::_compute
     Eigen::VectorXd ed(e_upper.rows() + e_lower.rows());
     ep << e_upper, e_lower;
 
-    if (ep.size() != ei_.size()) {
-        ei_.resize(ep.size());
-        ei_.setZero();
+    if (ep.size() != _ei.size()) {
+        _ei.resize(ep.size());
+        _ei.setZero();
     };
-    if (ep.size() != eprev_.size()) {
-        eprev_.resize(ep.size());
-        eprev_.setZero();
+    if (ep.size() != _eprev.size()) {
+        _eprev.resize(ep.size());
+        _eprev.setZero();
     };
 
     // compute integral and differential errors
-    ei_ += ep;
-    ei = ei_;
-    ed = (ep - eprev_)/_dt;
-    eprev_ = ep;
+    _ei += ep;
+    ei = _ei;
+    ed = (ep - _eprev)/_dt;
+    _eprev = ep;
 
     return std::make_tuple(ep, ei, ed);
 }
