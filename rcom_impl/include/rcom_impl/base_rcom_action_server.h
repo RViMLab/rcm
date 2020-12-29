@@ -201,7 +201,9 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
 
                 if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
                     ROS_INFO("%s: Suceeded\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
+                    _as.publishFeedback(fb);
                     _as.setSucceeded(rs);
                     update = false;
                 }
