@@ -64,6 +64,18 @@ class RCoMImpl {
         Eigen::Vector3d computePRCoM(Eigen::MatrixBase<derived>& p_i, Eigen::MatrixBase<derived>& p_ip1);
 
         /**
+         * @brief eq. 3, see paper
+         * 
+         * @param J_i Jacobian at p_i (Eigen::MatrixXd)
+         * @param J_ip1 Jacobian at p_ip1 (Eigen::MatrixXd)
+         * @param lambda see fig. 1, paper (double)
+         * @param p_i see fig. 1, paper (Eigen::Vector3d)
+         * @param p_ip1 see fig. 1, paper (Eigen::Vector3d)
+        **/
+        template<typename derived>
+        Eigen::MatrixXd computeRCoMJacobian(Eigen::MatrixXd& J_i, Eigen::MatrixXd& J_ip1, double lambda, Eigen::MatrixBase<derived>& p_i, Eigen::MatrixBase<derived>& p_ip1);
+
+        /**
          * @brief feedback lambda to remove drift
          * 
          * @param p_i see fig. 1, paper (Eigen::Vector3d)
@@ -76,6 +88,11 @@ class RCoMImpl {
          * @brief get _dt
         **/
         inline const double& getdt() const { return _dt; };
+
+        /**
+         * @brief get _lambda
+        **/
+        inline const double& getLambda() const { return _lambda; };
 
     private:
 
@@ -97,10 +114,6 @@ class RCoMImpl {
 
         // Control interval
         double _dt;
-
-        // eq. 3, see paper
-        template<typename derived>
-        Eigen::MatrixXd _computeRCoMJacobian(Eigen::MatrixXd& J_i, Eigen::MatrixXd& J_ip1, double lambda, Eigen::MatrixBase<derived>& p_i, Eigen::MatrixBase<derived>& p_ip1);
 
         // eq. 6 and following, see paper
         Eigen::MatrixXd _computeJacobian(Eigen::MatrixXd& J_t, Eigen::MatrixXd& J_RCM);
@@ -131,7 +144,7 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
     ) {
 
         // Compute Jacobians
-        auto J_rcm = _computeRCoMJacobian(J_i, J_ip1, _lambda, p_i, p_ip1);
+        auto J_rcm = computeRCoMJacobian(J_i, J_ip1, _lambda, p_i, p_ip1);
         auto J = _computeJacobian(J_t, J_rcm);
 
         // Compute error
@@ -178,21 +191,21 @@ Eigen::Vector3d RCoMImpl::computePRCoM(Eigen::MatrixBase<derived>& p_i, Eigen::M
 }
 
 
-// feedback lambda to remove drift, not in paper
-void RCoMImpl::feedbackLambda(Eigen::Vector3d& p_i, Eigen::Vector3d& p_ip1, Eigen::Vector3d& p_trocar) {
-    _lambda = (p_ip1 - p_i).normalized().dot(p_trocar - p_i)/(p_ip1 - p_i).norm();
-}
-
-
 // eq. 3, see paper
 template<typename derived>
-Eigen::MatrixXd RCoMImpl::_computeRCoMJacobian(Eigen::MatrixXd& J_i, Eigen::MatrixXd& J_ip1, double lambda, Eigen::MatrixBase<derived>& p_i, Eigen::MatrixBase<derived>& p_ip1) {
+Eigen::MatrixXd RCoMImpl::computeRCoMJacobian(Eigen::MatrixXd& J_i, Eigen::MatrixXd& J_ip1, double lambda, Eigen::MatrixBase<derived>& p_i, Eigen::MatrixBase<derived>& p_ip1) {
     auto J_RCM_left  = J_i + lambda*(J_ip1 - J_i); 
     auto J_RCM_right = p_ip1 - p_i;
 
     Eigen::MatrixXd J_RCM(J_RCM_left.rows(), J_RCM_left.cols() + J_RCM_right.cols());
     J_RCM << J_RCM_left, J_RCM_right;
     return J_RCM;
+}
+
+
+// feedback lambda to remove drift, not in paper
+void RCoMImpl::feedbackLambda(Eigen::Vector3d& p_i, Eigen::Vector3d& p_ip1, Eigen::Vector3d& p_trocar) {
+    _lambda = (p_ip1 - p_i).normalized().dot(p_trocar - p_i)/(p_ip1 - p_i).norm();
 }
 
 
