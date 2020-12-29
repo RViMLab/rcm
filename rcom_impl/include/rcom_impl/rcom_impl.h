@@ -226,7 +226,7 @@ std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd> RCoMImpl::_compute
     // compute integral and differential errors
     ei_ += ep;
     ei = ei_;
-    ed = ep - eprev_;
+    ed = (ep - eprev_)/_dt;
     eprev_ = ep;
 
     return std::make_tuple(ep, ei, ed);
