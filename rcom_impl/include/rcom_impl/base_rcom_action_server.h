@@ -90,11 +90,15 @@ class BaseRCoMActionServer {
         );
 
         // Execute goal on client robot
-        actionlib::SimpleClientGoalState _executeGoal(std::vector<double> q);
+        actionlib::SimpleClientGoalState _executeGoal(std::vector<double> q, bool wait_for_result=true);
 
         // Compute goal feedback and result
         template<typename T>
         T _computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar);
+
+        // State machines
+        actionlib::SimpleClientGoalState _positionControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
+        actionlib::SimpleClientGoalState _velocityControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
 };
 
 
@@ -141,8 +145,6 @@ BaseRCoMActionServer::~BaseRCoMActionServer() {
 
 
 void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
-
-    bool update = true;
     
     // Get desired positions from goal
     Eigen::VectorXd td;        // task
@@ -156,77 +158,13 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
 
     // Handle velocity goal
     if (goal->states.task.is_velocity) {
-        auto robot_state = _move_group.getCurrentState();
         auto q = _move_group.getCurrentJointValues();
         auto t = _computeTaskForwardKinematics(q);
         td = t + _rcom.getdt()*td;
     }
 
-    int iter = 0;
-
     // State machine
-    while (update) {
-
-        if (_as.isPreemptRequested() || !ros::ok()) {
-            ROS_INFO("%s: Preempted", _action_server.c_str());
-            _as.setPreempted();
-            update = false;
-            break;
-        }
-
-        // Compute joint angles that satisfy desired positions
-        auto q = _computeUpdate(td, p_trocar);
-        auto p = _computeRCoMForwardKinematics(q);
-        auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
-        auto t = _computeTaskForwardKinematics(q);
-        auto e = _computeError(td, t, p_trocar, prcm);
-
-        if (std::get<0>(e).norm() > _t1_td || std::get<1>(e).norm() > _t1_p_trocar ) {
-            ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
-            _as.setAborted();
-            update = false;
-        }
-        else {
-            auto status = _executeGoal(q);
-
-            if (status == actionlib::SimpleClientGoalState::SUCCEEDED) {
-                    q = _move_group.getCurrentJointValues();
-                    p = _computeRCoMForwardKinematics(q);
-                    prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
-                    t = _computeTaskForwardKinematics(q);
-                    e = _computeError(td, t, p_trocar, prcm);
-
-                    // Update lambda to remove drift
-                    _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
-
-                if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
-                    ROS_INFO("%s: Suceeded\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
-                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
-                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
-                    _as.publishFeedback(fb);
-                    _as.setSucceeded(rs);
-                    update = false;
-                }
-                else {
-                    ROS_INFO("%s: Iterating on joint angles\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
-                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
-                    _as.publishFeedback(fb);
-
-                    iter++;
-                    if (iter >= _max_iter) {
-                        ROS_INFO("%s: Aborted due to max_iter\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
-                        _as.setAborted();
-                        update = false;
-                    }
-                }
-            }
-            else {
-                ROS_INFO("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
-                _as.setAborted();
-                update = false;
-            }
-        }
-    }
+    _positionControlStateMachine(td, p_trocar);
 }
 
 
@@ -334,7 +272,7 @@ std::tuple<Eigen::VectorXd, Eigen::Vector3d> BaseRCoMActionServer::_computeError
 };
 
 
-actionlib::SimpleClientGoalState BaseRCoMActionServer::_executeGoal(std::vector<double> q) {
+actionlib::SimpleClientGoalState BaseRCoMActionServer::_executeGoal(std::vector<double> q, bool wait_for_result) {
     
     // Execute motion on client
     trajectory_msgs::JointTrajectoryPoint point;
@@ -346,7 +284,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_executeGoal(std::vector<
     goal.trajectory.points.push_back(point);
 
     _ac.sendGoal(goal);
-    _ac.waitForResult();
+    if (wait_for_result) _ac.waitForResult();
 
     return _ac.getState();
 };
@@ -373,5 +311,69 @@ T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vect
 
     return fb;
 };
+
+
+actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) {
+
+    for (int i = 0; i < _max_iter; i++) {
+
+        if (_as.isPreemptRequested() || !ros::ok()) {
+            ROS_INFO("%s: Preempted", _action_server.c_str());
+            _as.setPreempted();
+            return actionlib::SimpleClientGoalState::PREEMPTED;
+        }
+
+        // Compute joint angles that satisfy desired positions
+        auto q = _computeUpdate(td, p_trocar);
+        auto p = _computeRCoMForwardKinematics(q);
+        auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+        auto t = _computeTaskForwardKinematics(q);
+        auto e = _computeError(td, t, p_trocar, prcm);
+
+        if (std::get<0>(e).norm() > _t1_td || std::get<1>(e).norm() > _t1_p_trocar ) {
+            ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+            _as.setAborted();
+            return actionlib::SimpleClientGoalState::REJECTED;
+        }
+        else {
+            auto status = _executeGoal(q, true);
+
+            if (status == actionlib::SimpleClientGoalState::SUCCEEDED) {
+                    q = _move_group.getCurrentJointValues();
+                    p = _computeRCoMForwardKinematics(q);
+                    prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+                    t = _computeTaskForwardKinematics(q);
+                    e = _computeError(td, t, p_trocar, prcm);
+
+                    // Update lambda to remove drift
+                    _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
+
+                if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
+                    ROS_INFO("%s: Suceeded\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
+                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
+                    _as.publishFeedback(fb);
+                    _as.setSucceeded(rs);
+                    return actionlib::SimpleClientGoalState::SUCCEEDED;
+                }
+                else {
+                    ROS_INFO("%s: Iterating on joint angles\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
+                    _as.publishFeedback(fb);
+                }
+            }
+            else {
+                ROS_INFO("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
+                _as.setAborted();
+                return actionlib::SimpleClientGoalState::ABORTED;
+            }
+        }
+    }
+
+    ROS_INFO("%s: Aborted due to max_iter", _action_server.c_str());
+    _as.setAborted();
+    return actionlib::SimpleClientGoalState::ABORTED;
+};
+
 
 } // namespace rcom
