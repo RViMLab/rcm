@@ -67,9 +67,7 @@ Eigen::VectorXd RCoMActionServer::_computeTaskForwardKinematics(std::vector<doub
     auto robot_model = _move_group.getRobotModel();
     auto robot_state = moveit::core::RobotState(robot_model);
 
-    for (int i = 0; i < q.size(); i++) {
-        robot_state.setJointPositions(_move_group.getJointNames()[i], &q[i]);
-    }
+    robot_state.setJointGroupPositions(robot_state.getJointModelGroup(_move_group.getName()), q);
 
     tf::Matrix3x3 rot;
     tf::matrixEigenToTF(robot_state.getGlobalLinkTransform(_link_pip1).rotation(), rot);

@@ -6,6 +6,7 @@
 
 #include <ros/ros.h>
 #include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/common_planning_interface_objects/common_objects.h>
 #include <actionlib/client/simple_action_client.h>
 #include <actionlib/server/simple_action_server.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
@@ -83,18 +84,21 @@ class BaseRCoMActionServer {
         std::tuple<Eigen::Vector3d, Eigen::Vector3d> _computeRCoMForwardKinematics(std::vector<double>& q);
 
         std::tuple<Eigen::VectorXd, Eigen::Vector3d> _computeError(
-            Eigen::VectorXd& td,
-            Eigen::VectorXd& t,
-            Eigen::Vector3d& p_trocar,
-            Eigen::Vector3d& prcm
+            const Eigen::VectorXd& td,
+            const Eigen::VectorXd& t,
+            const Eigen::Vector3d& p_trocar,
+            const Eigen::Vector3d& prcm
         );
+
+        // Compute joint velocities
+        Eigen::VectorXd _computeJointVelocities(moveit::core::RobotStatePtr robot_state);
 
         // Execute goal on client robot
         actionlib::SimpleClientGoalState _executeGoal(std::vector<double> q, bool wait_for_result=true);
 
         // Compute goal feedback and result
         template<typename T>
-        T _computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar);
+        T _computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, bool is_velocity=false);
 
         // State machines
         actionlib::SimpleClientGoalState _positionControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
@@ -129,6 +133,10 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     _as.start();
     _move_group.setMaxVelocityScalingFactor(alpha);
 
+    // enable dynamics copying for velocity extraction from move_group https://github.com/ros-planning/moveit_ros/pull/622
+    auto current_state_monitor = moveit::planning_interface::getSharedStateMonitor(_move_group.getRobotModel(), moveit::planning_interface::getSharedTF());
+    current_state_monitor->enableCopyDynamics(true);
+
     _timer = nh.createTimer(ros::Duration(dt), &BaseRCoMActionServer::_timerCB, this);
     _state_pub = nh.advertise<rcom_msgs::rcom>(action_server + "/state", 1);
 }
@@ -156,15 +164,15 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     // Read trocar position
     tf::vectorMsgToEigen(goal->states.p_trocar.position, p_trocar);
 
-    // Handle velocity goal
-    if (goal->states.task.is_velocity) {
-        auto q = _move_group.getCurrentJointValues();
-        auto t = _computeTaskForwardKinematics(q);
-        td = t + _rcom.getdt()*td;
+    // State machines
+    if (goal->states.task.is_velocity) {  // Handle task velocity goal
+        _velocityControlStateMachine(td, p_trocar);
+        return;
     }
-
-    // State machine
-    _positionControlStateMachine(td, p_trocar);
+    if (!goal->states.task.is_velocity){  // Handle task position goal
+        _positionControlStateMachine(td, p_trocar);
+        return;
+    }
 }
 
 
@@ -245,9 +253,7 @@ std::tuple<Eigen::Vector3d, Eigen::Vector3d> BaseRCoMActionServer::_computeRCoMF
     auto robot_model = _move_group.getRobotModel();
     auto robot_state = moveit::core::RobotState(robot_model);
 
-    for (int i = 0; i < q.size(); i++) {
-        robot_state.setJointPositions(_move_group.getJointNames()[i], &q[i]);
-    }
+    robot_state.setJointGroupPositions(robot_state.getJointModelGroup(_move_group.getName()), q);
 
     auto pi = robot_state.getGlobalLinkTransform(_link_pi).translation();
     auto pip1 = robot_state.getGlobalLinkTransform(_link_pip1).translation();
@@ -257,10 +263,10 @@ std::tuple<Eigen::Vector3d, Eigen::Vector3d> BaseRCoMActionServer::_computeRCoMF
 
 
 std::tuple<Eigen::VectorXd, Eigen::Vector3d> BaseRCoMActionServer::_computeError(
-    Eigen::VectorXd& td,
-    Eigen::VectorXd& t,
-    Eigen::Vector3d& p_trocar,
-    Eigen::Vector3d& prcm
+    const Eigen::VectorXd& td,
+    const Eigen::VectorXd& t,
+    const Eigen::Vector3d& p_trocar,
+    const Eigen::Vector3d& prcm
 ) {
 
     // Compute error
@@ -270,6 +276,17 @@ std::tuple<Eigen::VectorXd, Eigen::Vector3d> BaseRCoMActionServer::_computeError
 
     return std::make_tuple(t_td, t_p_trocar);
 };
+
+
+Eigen::VectorXd BaseRCoMActionServer::_computeJointVelocities(moveit::core::RobotStatePtr robot_state) { 
+    Eigen::VectorXd dq(_move_group.getJointNames().size());
+
+    if (robot_state->hasVelocities()) {  // not coppied by default https://github.com/ros-planning/moveit_ros/pull/622
+        robot_state->copyJointGroupVelocities(robot_state->getJointModelGroup(_move_group.getName()), dq);
+    }
+
+    return dq;
+}
 
 
 actionlib::SimpleClientGoalState BaseRCoMActionServer::_executeGoal(std::vector<double> q, bool wait_for_result) {
@@ -291,11 +308,11 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_executeGoal(std::vector<
 
 
 template<typename T>
-T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar) {
+T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, bool is_velocity) {
     T fb;
 
-    fb.errors.task.is_velocity = false;
-    fb.states.task.is_velocity = false;
+    fb.errors.task.is_velocity = is_velocity;
+    fb.states.task.is_velocity = is_velocity;
 
     // Allocate space for mapping
     fb.errors.task.values.resize(std::get<0>(e).size());
@@ -305,7 +322,7 @@ T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vect
     Eigen::VectorXd::Map(fb.errors.task.values.data(), std::get<0>(e).size()) = std::get<0>(e);
     tf::vectorEigenToMsg(std::get<1>(e), fb.errors.p_trocar.position);
 
-    // Feedback positions
+    // Feedback task and trocar position
     Eigen::VectorXd::Map(fb.states.task.values.data(), t.size()) = t;
     tf::vectorEigenToMsg(p_trocar, fb.states.p_trocar.position);
 
@@ -330,7 +347,12 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
         auto t = _computeTaskForwardKinematics(q);
         auto e = _computeError(td, t, p_trocar, prcm);
 
-        if (std::get<0>(e).norm() > _t1_td || std::get<1>(e).norm() > _t1_p_trocar ) {
+        if (std::get<0>(e).norm() > _t1_td) {
+            ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+            _as.setAborted();
+            return actionlib::SimpleClientGoalState::REJECTED;
+        } 
+        else if (std::get<1>(e).norm() > _t1_p_trocar) {
             ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
             _as.setAborted();
             return actionlib::SimpleClientGoalState::REJECTED;
@@ -350,15 +372,15 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
 
                 if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
                     ROS_INFO("%s: Suceeded\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
-                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
-                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm);
+                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, false);
+                    auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm, false);
                     _as.publishFeedback(fb);
                     _as.setSucceeded(rs);
                     return actionlib::SimpleClientGoalState::SUCCEEDED;
                 }
                 else {
                     ROS_INFO("%s: Iterating on joint angles\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
-                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm);
+                    auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, false);
                     _as.publishFeedback(fb);
                 }
             }
@@ -373,6 +395,71 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
     ROS_INFO("%s: Aborted due to max_iter", _action_server.c_str());
     _as.setAborted();
     return actionlib::SimpleClientGoalState::ABORTED;
+};
+
+
+actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) {
+
+    if (_as.isPreemptRequested() || !ros::ok()) {
+        ROS_INFO("%s: Preempted", _action_server.c_str());
+        _as.setPreempted();
+        return actionlib::SimpleClientGoalState::PREEMPTED;
+    }
+
+    auto dtd = td;  // safe velocity task
+
+    // Convert velocity task to position task
+    auto q = _move_group.getCurrentJointValues();
+    auto t = _computeTaskForwardKinematics(q);
+    td = t + _rcom.getdt()*dtd;
+
+    // Compute joint angles that satisfy desired positions
+    q = _computeUpdate(td, p_trocar);
+    auto p = _computeRCoMForwardKinematics(q);
+    auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+    auto robot_state = _move_group.getCurrentState();
+    auto dq = _computeJointVelocities(robot_state);
+    Eigen::VectorXd dt = _computeTaskJacobian(robot_state)*dq;  // compute task velocity via task Jacobian, Jdq = dt
+    auto e = _computeError(dtd, dt, p_trocar, prcm);
+
+    if (std::get<0>(e).norm() > _t1_td) {
+        ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+        _as.setAborted();
+        return actionlib::SimpleClientGoalState::REJECTED;
+    } 
+    else if (std::get<1>(e).norm() > _t1_p_trocar) {
+        ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+        _as.setAborted();
+        return actionlib::SimpleClientGoalState::REJECTED;
+    }
+    else {
+        auto status = _executeGoal(q, false);  // don't wait for execution to finish
+
+        if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
+            q = _move_group.getCurrentJointValues();
+            p = _computeRCoMForwardKinematics(q);
+            prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+            robot_state = _move_group.getCurrentState();
+            dq = _computeJointVelocities(robot_state);
+            dt = _computeTaskJacobian(robot_state)*dq;  // compute task velocity via task Jacobian, Jdq = dt
+            e = _computeError(dtd, dt, p_trocar, prcm);
+
+            // Update lambda to remove drift
+            _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
+
+            ROS_INFO("%s: Suceeded\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+            auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, dt, prcm, true);  // TODO: update feedback
+            auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, dt, prcm, true);
+            _as.publishFeedback(fb);
+            _as.setSucceeded(rs);
+            return actionlib::SimpleClientGoalState::SUCCEEDED;
+        }
+        else {
+            ROS_INFO("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
+            _as.setAborted();
+            return actionlib::SimpleClientGoalState::ABORTED;
+        }
+    }
 };
 
 
