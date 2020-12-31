@@ -99,6 +99,14 @@ class BaseRCoMActionServer {
         // Compute goal feedback and result
         template<typename T>
         T _computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, bool is_velocity=false);
+        
+        // Output convenience function
+        std::stringstream _streamState(
+            const Eigen::VectorXd& td,
+            const Eigen::VectorXd& t,
+            const Eigen::Vector3d& p_trocar,
+            const Eigen::Vector3d& prcm
+        );
 
         // State machines
         actionlib::SimpleClientGoalState _positionControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
@@ -330,6 +338,49 @@ T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vect
 };
 
 
+std::stringstream BaseRCoMActionServer::_streamState(
+    const Eigen::VectorXd& td,
+    const Eigen::VectorXd& t,
+    const Eigen::Vector3d& p_trocar,
+    const Eigen::Vector3d& prcm
+) {
+    std::stringstream ss;
+
+    ss << "desired task:            (";
+    for (int i=0; i < td.size(); i++) {
+        ss << td[i];
+        if (i == td.size() - 1) continue;
+        ss << ", ";
+    }
+    ss << ")\n";
+
+    ss << "current task:            (";
+    for (int i=0; i < t.size(); i++) {
+        ss << t[i];
+        if (i == t.size() - 1) continue;
+        ss << ", ";
+    }
+    ss << ")\n";
+
+    ss << "desired trocar position: (";
+    for (int i=0; i < p_trocar.size(); i++) {
+        ss << p_trocar[i];
+        if (i == p_trocar.size() - 1) continue;
+        ss << ", ";
+    }
+    ss << ")\n";
+
+    ss << "current trocar position: (";
+    for (int i=0; i < prcm.size(); i++) {
+        ss << prcm[i];
+        if (i == prcm.size() - 1) continue;
+        ss << ", ";
+    }
+    ss << ")\n";
+    return ss;
+};
+
+
 actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) {
 
     for (int i = 0; i < _max_iter; i++) {
@@ -348,12 +399,14 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
         auto e = _computeError(td, t, p_trocar, prcm);
 
         if (std::get<0>(e).norm() > _t1_td) {
-            ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+            auto ss = _streamState(td, t, p_trocar, prcm);
+            ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             _as.setAborted();
             return actionlib::SimpleClientGoalState::REJECTED;
         } 
         else if (std::get<1>(e).norm() > _t1_p_trocar) {
-            ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+            auto ss = _streamState(td, t, p_trocar, prcm);
+            ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             _as.setAborted();
             return actionlib::SimpleClientGoalState::REJECTED;
         }
@@ -371,7 +424,8 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
                     _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
                 if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
-                    ROS_INFO("%s: Suceeded\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+                    auto ss = _streamState(td, t, p_trocar, prcm);
+                    ROS_INFO("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, false);
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm, false);
                     _as.publishFeedback(fb);
@@ -379,7 +433,8 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
                     return actionlib::SimpleClientGoalState::SUCCEEDED;
                 }
                 else {
-                    ROS_INFO("%s: Iterating on joint angles\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+                    auto ss = _streamState(td, t, p_trocar, prcm);
+                    ROS_INFO("%s: Iterating on joint angles\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, false);
                     _as.publishFeedback(fb);
                 }
@@ -409,7 +464,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
     auto dtd = td;  // safe velocity task
 
     // Convert velocity task to position task
-    auto q = _move_group.getCurrentJointValues();
+    auto q = _move_group.getCurrentJointValues();  // introduces drift without feedback
     auto t = _computeTaskForwardKinematics(q);
     td = t + _rcom.getdt()*dtd;
 
@@ -423,12 +478,14 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
     auto e = _computeError(dtd, dt, p_trocar, prcm);
 
     if (std::get<0>(e).norm() > _t1_td) {
-        ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+        auto ss = _streamState(dtd, dt, p_trocar, prcm);
+        ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
         _as.setAborted();
         return actionlib::SimpleClientGoalState::REJECTED;
     } 
     else if (std::get<1>(e).norm() > _t1_p_trocar) {
-        ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+        auto ss = _streamState(dtd, dt, p_trocar, prcm);
+        ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
         _as.setAborted();
         return actionlib::SimpleClientGoalState::REJECTED;
     }
@@ -447,7 +504,8 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
             // Update lambda to remove drift
             _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
-            ROS_INFO("%s: Suceeded\npi:   (%f, %f, ,%f)\nprcm: (%f, %f, ,%f)\npip1: (%f, %f, %f)", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2]);
+            auto ss = _streamState(dtd, dt, p_trocar, prcm);
+            ROS_INFO("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, dt, prcm, true);  // TODO: update feedback
             auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, dt, prcm, true);
             _as.publishFeedback(fb);
