@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
 
     // Initialize position
     auto move_group = moveit::planning_interface::MoveGroupInterface(planning_group);
-    move_group.setMaxVelocityScalingFactor(1.0);
+    move_group.setMaxVelocityScalingFactor(0.01);
 
     // Go home
     move_group.setNamedTarget("home");
@@ -57,9 +57,9 @@ int main(int argc, char** argv) {
     // Set an initial pose, corresponding to p_trocar
     auto joint_values = move_group.getCurrentJointValues();
 
-    joint_values[1] = -1.0*M_PI/4.;
-    joint_values[3] = -2.0*M_PI/2.;
-    joint_values[5] = +1.0*M_PI/4.;
+    // joint_values[1] = -1.0*M_PI/4.;
+    // joint_values[3] = -2.0*M_PI/2.;
+    // joint_values[5] = +1.0*M_PI/4.;
 
     // joint_values[1] = 1.0*M_PI/4.;
     // joint_values[2] = 1.0*M_PI/4.;
@@ -68,13 +68,21 @@ int main(int argc, char** argv) {
     // joint_values[5] = 1.0*M_PI/4.;
     // joint_values[6] = 1.0*M_PI/4.;
 
-    // joint_values[0]  =   58.67*M_PI/180.;
-    // joint_values[1]  =   51.53*M_PI/180.;
-    // joint_values[2]  =   10.87*M_PI/180.;
-    // joint_values[3]  = - 77.50*M_PI/180.;
-    // joint_values[4]  =   61.94*M_PI/180.;
-    // joint_values[5]  = - 22.29*M_PI/180.;
-    // joint_values[6]  =   81.79*M_PI/180.;
+    // joint_values[0]  = - 85.15*M_PI/180.;
+    // joint_values[1]  = - 41.71*M_PI/180.;
+    // joint_values[2]  =    0.79*M_PI/180.;
+    // joint_values[3]  =   78.44*M_PI/180.;
+    // joint_values[4]  = - 50.62*M_PI/180.;
+    // joint_values[5]  = - 20.25*M_PI/180.;
+    // joint_values[6]  = - 15.22*M_PI/180.;
+
+    joint_values[0]  = - 0.2501;
+    joint_values[1]  = - 1.1689;
+    joint_values[2]  = - 1.2689;
+    joint_values[3]  =   1.5887;
+    joint_values[4]  =   0.2596;
+    joint_values[5]  =   0.1416;
+    joint_values[6]  = - 1.5293;
 
     move_group.setJointValueTarget(joint_values);
     move_group.move();
