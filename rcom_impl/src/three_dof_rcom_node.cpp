@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
 
     // Initialize position
     auto move_group = moveit::planning_interface::MoveGroupInterface(planning_group);
-    move_group.setMaxVelocityScalingFactor(0.01);
+    move_group.setMaxVelocityScalingFactor(1.0);
 
     // Go home
     move_group.setNamedTarget("home");
