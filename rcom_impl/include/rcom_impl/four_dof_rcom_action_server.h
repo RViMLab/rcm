@@ -9,11 +9,11 @@
 namespace rcom
 {
 
-class RCoMActionServer : BaseRCoMActionServer {
+class FourDoFRCoMActionServer : BaseRCoMActionServer {
 
     public:
 
-        RCoMActionServer(      
+        FourDoFRCoMActionServer(      
             ros::NodeHandle nh, std::string action_server, std::string control_client, 
             std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt,
             std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
@@ -31,7 +31,7 @@ class RCoMActionServer : BaseRCoMActionServer {
 };
 
 
-RCoMActionServer::RCoMActionServer(
+FourDoFRCoMActionServer::FourDoFRCoMActionServer(
     ros::NodeHandle nh, std::string action_server, std::string control_client, 
     std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt,
     std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
@@ -45,7 +45,7 @@ RCoMActionServer::RCoMActionServer(
     t1_td, t1_p_trocar, t2_td, t2_p_trocar, t_td_scale, max_iter) {   };
 
 
-Eigen::MatrixXd RCoMActionServer::_computeTaskJacobian(moveit::core::RobotStatePtr robot_state) {
+Eigen::MatrixXd FourDoFRCoMActionServer::_computeTaskJacobian(moveit::core::RobotStatePtr robot_state) {
 
     // Compute task jacobian
     Eigen::MatrixXd Jt;
@@ -61,7 +61,7 @@ Eigen::MatrixXd RCoMActionServer::_computeTaskJacobian(moveit::core::RobotStateP
 };
 
 
-Eigen::VectorXd RCoMActionServer::_computeTaskForwardKinematics(std::vector<double>& q) {
+Eigen::VectorXd FourDoFRCoMActionServer::_computeTaskForwardKinematics(std::vector<double>& q) {
 
     // Compute forward kinematics
     auto robot_model = _move_group.getRobotModel();

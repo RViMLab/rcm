@@ -3,7 +3,7 @@
 #include <ros/ros.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 
-#include <rcom_impl/rcom_action_server.h>
+#include <rcom_impl/three_dof_rcom_action_server.h>
 
 
 int main(int argc, char** argv) {
@@ -90,7 +90,7 @@ int main(int argc, char** argv) {
 
     move_group.setMaxVelocityScalingFactor(1.0);
     // Action server
-    rcom::RCoMActionServer rcom_as(
+    rcom::ThreeDoFRCoMActionServer rcom_as(
         nh, action_server, control_client,
         kpt, kit, kdt, kprcm, kircm, kdrcm, lambda0, dt,
         planning_group, alpha, link_pi, link_pip1,
