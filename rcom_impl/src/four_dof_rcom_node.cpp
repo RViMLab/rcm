@@ -8,7 +8,7 @@
 
 int main(int argc, char** argv) {
 
-    ros::init(argc, argv, "rcom_node");
+    ros::init(argc, argv, "four_dof_rcom_node");
     auto nh = ros::NodeHandle();
     auto spinner = ros::AsyncSpinner(2);
     spinner.start();
