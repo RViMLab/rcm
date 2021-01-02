@@ -4,6 +4,7 @@
 #include <eigen3/Eigen/Core>
 #include <tuple>
 
+#include <rcom_impl/damped_least_squares.h>
 #include <rcom_impl/pseudo_inverse.h>
 
 
@@ -41,6 +42,7 @@ class RCoMImpl {
          * @param J_i Jacobian at p_i (Eigen::MatrixXd)
          * @param J_ip1 Jacobian at p_ip1 (Eigen::MatrixXd)
          * @param J_t task Jacobian (Eigen::MatrixXd)
+         * @param lambda_regularizer add lambda regularizer, see eq. 7 paper (bool)
         **/
         template<typename derived>
         Eigen::VectorXd computeFeedback(
@@ -51,7 +53,8 @@ class RCoMImpl {
                 Eigen::MatrixBase<derived>& p_ip1,
                 Eigen::MatrixXd& J_i,
                 Eigen::MatrixXd& J_ip1,
-                Eigen::MatrixXd& J_t
+                Eigen::MatrixXd& J_t,
+                bool lambda_regularizer=false
         );
 
         /**
@@ -119,6 +122,8 @@ class RCoMImpl {
         Eigen::MatrixXd _computeJacobian(Eigen::MatrixXd& J_t, Eigen::MatrixXd& J_RCM);
 
         std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd> _computeError(Eigen::VectorXd& td, Eigen::VectorXd& t, Eigen::Vector3d& p_trocar, Eigen::Vector3d& p);
+
+        Eigen::VectorXd _computeLambdaRegularizer(Eigen::MatrixXd& J, Eigen::MatrixXd& J_pseudo_inverse, double lambda);
 };
 
 
@@ -140,7 +145,8 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         Eigen::MatrixBase<derived>& p_ip1,
         Eigen::MatrixXd& J_i,
         Eigen::MatrixXd& J_ip1,
-        Eigen::MatrixXd& J_t
+        Eigen::MatrixXd& J_t,
+        bool lambda_regularizer
     ) {
 
         // Compute Jacobians
@@ -156,6 +162,7 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
 
         // Compute feedback dq, eq. 7
         auto J_pseudo_inverse = pseudoinverse(J);
+        auto J_damped_least_squares = dampedLeastSquares(J);
 
         int nt = J_t.rows();
         Eigen::MatrixXd Kp = Eigen::MatrixXd::Zero(3+nt, 3+nt);
@@ -174,10 +181,15 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         Ki.bottomRightCorner(3, 3) = _kircm.asDiagonal();
         Kd.bottomRightCorner(3, 3) = _kdrcm.asDiagonal();
 
-        auto dq = J_pseudo_inverse*(Kp*ep + Ki*ei + Kd*ed);
+        Eigen::VectorXd dq = J_damped_least_squares*(Kp*ep + Ki*ei + Kd*ed);
+
+        if (lambda_regularizer) {
+            dq += _computeLambdaRegularizer(J, J_pseudo_inverse, _lambda);
+        }
 
         // Update lambda
         _lambda += _dt*dq[dq.size() - 1];
+        std::cout << "lambda: " << _lambda << std::endl;
 
         // Return only joint velocities, not dlambda
         return _dt*dq.topRows(dq.size() - 1);
@@ -244,5 +256,12 @@ std::tuple<Eigen::VectorXd, Eigen::VectorXd, Eigen::VectorXd> RCoMImpl::_compute
 
     return std::make_tuple(ep, ei, ed);
 }
+
+Eigen::VectorXd RCoMImpl::_computeLambdaRegularizer(Eigen::MatrixXd& J, Eigen::MatrixXd& J_pseudo_inverse, double lambda) {
+    Eigen::VectorXd w(J.cols());
+    Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(J.cols(), J.cols());
+    w[w.size() - 1] = _lambda0 - lambda;
+    return (identity - J_pseudo_inverse*J)*w;
+};
 
 } // end of namespace rcom
