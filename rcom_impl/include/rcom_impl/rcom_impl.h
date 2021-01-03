@@ -161,8 +161,8 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         auto ed = std::get<2>(e);
 
         // Compute feedback dq, eq. 7
-        auto J_pseudo_inverse = pseudoinverse(J);
-        auto J_damped_least_squares = dampedLeastSquares(J);
+        // auto J_inverse = pseudoinverse(J);
+        auto J_inverse = dampedLeastSquares(J);
 
         int nt = J_t.rows();
         Eigen::MatrixXd Kp = Eigen::MatrixXd::Zero(3+nt, 3+nt);
@@ -181,15 +181,14 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         Ki.bottomRightCorner(3, 3) = _kircm.asDiagonal();
         Kd.bottomRightCorner(3, 3) = _kdrcm.asDiagonal();
 
-        Eigen::VectorXd dq = J_damped_least_squares*(Kp*ep + Ki*ei + Kd*ed);
+        Eigen::VectorXd dq = J_inverse*(Kp*ep + Ki*ei + Kd*ed);
 
         if (lambda_regularizer) {
-            dq += _computeLambdaRegularizer(J, J_pseudo_inverse, _lambda);
+            dq += _computeLambdaRegularizer(J, J_inverse, _lambda);
         }
 
         // Update lambda
         _lambda += _dt*dq[dq.size() - 1];
-        std::cout << "lambda: " << _lambda << std::endl;
 
         // Return only joint velocities, not dlambda
         return _dt*dq.topRows(dq.size() - 1);
