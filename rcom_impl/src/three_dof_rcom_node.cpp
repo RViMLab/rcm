@@ -92,13 +92,21 @@ int main(int argc, char** argv) {
     // joint_values[5] = -1.2412048;
     // joint_values[6] =  0.0036204;
 
-    joint_values[0]  =  0.4422;
-    joint_values[1]  = -1.6297;
-    joint_values[2]  = -1.5751;
-    joint_values[3]  = -0.6265;
-    joint_values[4]  =  0.0230;
-    joint_values[5]  =  0.4897;
-    joint_values[6]  = -0.8020;
+    // joint_values[0]  =  0.4422;
+    // joint_values[1]  = -1.6297;
+    // joint_values[2]  = -1.5751;
+    // joint_values[3]  = -0.6265;
+    // joint_values[4]  =  0.0230;
+    // joint_values[5]  =  0.4897;
+    // joint_values[6]  = -0.8020;
+
+    joint_values[0]  = -2.2984826451234;
+    joint_values[1]  = 1.69281634903135;
+    joint_values[2]  = -0.5179222776075;
+    joint_values[3]  = 1.98368018817924;
+    joint_values[4]  = 2.17922032575187;
+    joint_values[5]  = 1.05067073761087;
+    joint_values[6]  = 0.41726981677228;
 
     move_group.setJointValueTarget(joint_values);
     move_group.move();

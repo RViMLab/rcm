@@ -9,7 +9,7 @@
 // adaptive lambda file:///tmp/mozilla_martin0/Wan2018_Article_AStudyOnAvoidingJointLimitsFor.pdf
 template <class MatT>
 Eigen::Matrix<typename MatT::Scalar, MatT::ColsAtCompileTime, MatT::RowsAtCompileTime>
-dampedLeastSquares(const MatT &mat, typename MatT::Scalar lambda = typename MatT::Scalar{1e-2}) // choose appropriately
+dampedLeastSquares(const MatT &mat, typename MatT::Scalar lambda = typename MatT::Scalar{1e-1}) // choose appropriately
 {
     typedef typename MatT::Scalar Scalar;
     auto svd = mat.jacobiSvd(Eigen::ComputeFullU | Eigen::ComputeFullV);
