@@ -222,19 +222,23 @@ std::vector<double> BaseRCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Ei
     Eigen::MatrixXd Ji;
     Eigen::MatrixXd Jip1;
 
-    robot_state->getJacobian(
+    bool computed = true;
+
+    computed = computed && robot_state->getJacobian(
         robot_state->getJointModelGroup(_planning_group),
         robot_state->getLinkModel(_link_pi),
         Eigen::Vector3d::Zero(),
         Ji
     );
 
-    robot_state->getJacobian(
+    computed = computed && robot_state->getJacobian(
         robot_state->getJointModelGroup(_planning_group),
         robot_state->getLinkModel(_link_pip1),
         Eigen::Vector3d::Zero(),
         Jip1
     );
+
+    if (!computed) return q;
 
     Eigen::MatrixXd Jt = _computeTaskJacobian(robot_state);
     Eigen::VectorXd t = _computeTaskForwardKinematics(q);
