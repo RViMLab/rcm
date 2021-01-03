@@ -6,7 +6,8 @@ planning_group: 'arm_endoscope'
 kpt: [1.,1.,1.,1.]
 kit: [0.0,0.0,0.0,0.0]
 kdt: [0.0,0.0,0.0,0.0]
-kprcm: [10., 10., 10.]
+# 1st config kprcm: [10., 10., 10.]
+kprcm: [5., 5., 5.]
 kircm: [0.0, 0.0, 0.0]
 kdrcm: [0.0, 0.0, 0.0]
 lambda0: 0.7
@@ -22,7 +23,7 @@ link_pi: 'storz_endoscope_link_1'
 link_pip1: 'storz_endoscope_link_cm'
 
 # threshold 1, divergence check prior to execution
-t1_td: 0.01
+t1_td: 10.0
 t1_p_trocar: 0.01
 
 # threshold 2, convergence check after execution
