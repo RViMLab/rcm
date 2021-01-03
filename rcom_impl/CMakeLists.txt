@@ -38,6 +38,9 @@ target_link_libraries(three_dof_rcom_node ${catkin_LIBRARIES})
 add_executable(four_dof_rcom_node src/four_dof_rcom_node.cpp)
 target_link_libraries(four_dof_rcom_node ${catkin_LIBRARIES})
 
+add_executable(five_dof_rcom_node src/five_dof_rcom_node.cpp)
+target_link_libraries(five_dof_rcom_node ${catkin_LIBRARIES})
+
 # Install
 install(
     DIRECTORY include/rcom_impl/
@@ -45,6 +48,6 @@ install(
 )
 
 install(
-    TARGETS three_dof_rcom_node four_dof_rcom_node
+    TARGETS three_dof_rcom_node four_dof_rcom_node five_dof_rcom_node
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
