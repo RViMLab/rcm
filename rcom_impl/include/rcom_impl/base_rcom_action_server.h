@@ -378,7 +378,7 @@ std::stringstream BaseRCoMActionServer::_streamState(
     }
     ss << ")\n";
 
-    ss << "current lamda:           " << _rcom.getLambda() << "\n";
+    ss << "current lambda:          " << _rcom.getLambda() << "\n";
 
     return ss;
 };
