@@ -76,13 +76,29 @@ int main(int argc, char** argv) {
     // joint_values[5]  = - 20.25*M_PI/180.;
     // joint_values[6]  = - 15.22*M_PI/180.;
 
-    joint_values[0]  = - 0.2501;
-    joint_values[1]  = - 1.1689;
-    joint_values[2]  = - 1.2689;
-    joint_values[3]  =   1.5887;
-    joint_values[4]  =   0.2596;
-    joint_values[5]  =   0.1416;
-    joint_values[6]  = - 1.5293;
+    // joint_values[0]  = - 1.1784;
+    // joint_values[1]  =   1.0322;
+    // joint_values[2]  = - 0.0233;
+    // joint_values[3]  = - 1.3586;
+    // joint_values[4]  = - 1.6409;
+    // joint_values[5]  = - 1.6744;
+    // joint_values[6]  =   1.4576;
+
+    // joint_values[0] = -0.0225921;
+    // joint_values[1] = -0.0948019;
+    // joint_values[2] =  0.0266029;
+    // joint_values[3] =  0.9266743;
+    // joint_values[4] = -0.0062513;
+    // joint_values[5] = -1.2412048;
+    // joint_values[6] =  0.0036204;
+
+    joint_values[0]  =  0.4422;
+    joint_values[1]  = -1.6297;
+    joint_values[2]  = -1.5751;
+    joint_values[3]  = -0.6265;
+    joint_values[4]  =  0.0230;
+    joint_values[5]  =  0.4897;
+    joint_values[6]  = -0.8020;
 
     move_group.setJointValueTarget(joint_values);
     move_group.move();
