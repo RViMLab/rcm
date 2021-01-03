@@ -3,16 +3,16 @@ control_client: 'PositionJointInterface_trajectory_controller/follow_joint_traje
 planning_group: 'arm_endoscope'
 
 # task and remote center of motion gains - proportional, integral, differential
-kpt: [10.0,10.0,10.0,10.0]
+kpt: [1.,1.,1.,1.]
 kit: [0.0,0.0,0.0,0.0]
 kdt: [0.0,0.0,0.0,0.0]
-kprcm: [40.0, 40.0, 40.0]
+kprcm: [10., 10., 10.]
 kircm: [0.0, 0.0, 0.0]
 kdrcm: [0.0, 0.0, 0.0]
-lambda0: 0.4
+lambda0: 0.7
 
 # control interval, in velocity control: rate at which rcom goals are sent, else: sets interval to execute incremental motion
-dt: 0.002
+dt: 0.01
 
 # velocity scaling
 alpha: 0.1
@@ -22,12 +22,12 @@ link_pi: 'storz_endoscope_link_1'
 link_pip1: 'storz_endoscope_link_cm'
 
 # threshold 1, divergence check prior to execution
-t1_td: 0.1
-t1_p_trocar: 0.1
+t1_td: 0.01
+t1_p_trocar: 0.01
 
 # threshold 2, convergence check after execution
-t2_td: 0.0001
-t2_p_trocar: 0.0001
+t2_td: 0.001
+t2_p_trocar: 0.001
 
 # threshold scale
 t_td_scale: [1.0, 1.0, 1.0, 0.1]
