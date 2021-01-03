@@ -105,7 +105,8 @@ class BaseRCoMActionServer {
             const Eigen::VectorXd& td,
             const Eigen::VectorXd& t,
             const Eigen::Vector3d& p_trocar,
-            const Eigen::Vector3d& prcm
+            const Eigen::Vector3d& prcm,
+            const std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e
         );
 
         // State machines
@@ -342,7 +343,8 @@ std::stringstream BaseRCoMActionServer::_streamState(
     const Eigen::VectorXd& td,
     const Eigen::VectorXd& t,
     const Eigen::Vector3d& p_trocar,
-    const Eigen::Vector3d& prcm
+    const Eigen::Vector3d& prcm,
+    const std::tuple<Eigen::VectorXd, Eigen::Vector3d>& e
 ) {
     std::stringstream ss;
 
@@ -362,6 +364,14 @@ std::stringstream BaseRCoMActionServer::_streamState(
     }
     ss << ")\n";
 
+    ss << "task error:              (";
+    for (int i=0; i < std::get<0>(e).size(); i++) {
+        ss << std::get<0>(e)[i];
+        if (i == std::get<0>(e).size() - 1) continue;
+        ss << ", ";
+    }
+    ss << ")\n";
+
     ss << "desired trocar position: (";
     for (int i=0; i < p_trocar.size(); i++) {
         ss << p_trocar[i];
@@ -374,6 +384,14 @@ std::stringstream BaseRCoMActionServer::_streamState(
     for (int i=0; i < prcm.size(); i++) {
         ss << prcm[i];
         if (i == prcm.size() - 1) continue;
+        ss << ", ";
+    }
+    ss << ")\n";
+
+    ss << "trocar position error:   (";
+    for (int i=0; i < std::get<1>(e).size(); i++) {
+        ss << std::get<1>(e)[i];
+        if (i == std::get<1>(e).size() - 1) continue;
         ss << ", ";
     }
     ss << ")\n";
@@ -402,13 +420,13 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
         auto e = _computeError(td, t, p_trocar, prcm);
 
         if (std::get<0>(e).norm() > _t1_td) {
-            auto ss = _streamState(td, t, p_trocar, prcm);
+            auto ss = _streamState(td, t, p_trocar, prcm, e);
             ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             _as.setAborted();
             return actionlib::SimpleClientGoalState::REJECTED;
         } 
         else if (std::get<1>(e).norm() > _t1_p_trocar) {
-            auto ss = _streamState(td, t, p_trocar, prcm);
+            auto ss = _streamState(td, t, p_trocar, prcm, e);
             ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             _as.setAborted();
             return actionlib::SimpleClientGoalState::REJECTED;
@@ -427,7 +445,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
                     _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
                 if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
-                    auto ss = _streamState(td, t, p_trocar, prcm);
+                    auto ss = _streamState(td, t, p_trocar, prcm, e);
                     ROS_INFO("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, false);
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm, false);
@@ -436,7 +454,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
                     return actionlib::SimpleClientGoalState::SUCCEEDED;
                 }
                 else {
-                    auto ss = _streamState(td, t, p_trocar, prcm);
+                    auto ss = _streamState(td, t, p_trocar, prcm, e);
                     ROS_INFO("%s: Iterating on joint angles\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, false);
                     _as.publishFeedback(fb);
@@ -481,13 +499,13 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
     auto e = _computeError(dtd, dt, p_trocar, prcm);
 
     if (std::get<0>(e).norm() > _t1_td) {
-        auto ss = _streamState(dtd, dt, p_trocar, prcm);
+        auto ss = _streamState(dtd, dt, p_trocar, prcm, e);
         ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
         _as.setAborted();
         return actionlib::SimpleClientGoalState::REJECTED;
     } 
     else if (std::get<1>(e).norm() > _t1_p_trocar) {
-        auto ss = _streamState(dtd, dt, p_trocar, prcm);
+        auto ss = _streamState(dtd, dt, p_trocar, prcm, e);
         ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
         _as.setAborted();
         return actionlib::SimpleClientGoalState::REJECTED;
@@ -507,7 +525,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
             // Update lambda to remove drift
             _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
-            auto ss = _streamState(dtd, dt, p_trocar, prcm);
+            auto ss = _streamState(dtd, dt, p_trocar, prcm, e);
             ROS_INFO("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, dt, prcm, true);  // TODO: update feedback
             auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, dt, prcm, true);
