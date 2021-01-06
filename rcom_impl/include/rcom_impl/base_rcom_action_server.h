@@ -51,6 +51,7 @@ class BaseRCoMActionServer {
 
         // Actual RCoM implementation
         rcom::RCoMImpl _rcom;
+        Eigen::Vector3d _last_known_p_trocar;
 
         // Robot model
         std::string _planning_group;
@@ -146,6 +147,12 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     auto current_state_monitor = moveit::planning_interface::getSharedStateMonitor(_move_group.getRobotModel(), moveit::planning_interface::getSharedTF());
     current_state_monitor->enableCopyDynamics(true);
 
+    // initialize trocar position  
+    auto q = _move_group.getCurrentJointValues();
+    auto p = _computeRCoMForwardKinematics(q);
+
+    _last_known_p_trocar = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+
     _timer = nh.createTimer(ros::Duration(dt), &BaseRCoMActionServer::_timerCB, this);
     _state_pub = nh.advertise<rcom_msgs::rcom>(action_server + "/state", 1);
 }
@@ -171,7 +178,13 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     td = _transformTask(td);
 
     // Read trocar position
-    tf::vectorMsgToEigen(goal->states.p_trocar.position, p_trocar);
+    if (goal->states.p_trocar.is_empty) {
+        p_trocar = _last_known_p_trocar;
+    }
+    else {
+        tf::vectorMsgToEigen(goal->states.p_trocar.position, p_trocar);
+        _last_known_p_trocar = p_trocar;
+    }
 
     // State machines
     if (goal->states.task.is_velocity) {  // Handle task velocity goal
@@ -326,6 +339,9 @@ T BaseRCoMActionServer::_computeFeedback(std::tuple<Eigen::VectorXd, Eigen::Vect
 
     fb.errors.task.is_velocity = is_velocity;
     fb.states.task.is_velocity = is_velocity;
+
+    fb.errors.p_trocar.is_empty = false;
+    fb.states.p_trocar.is_empty = false;
 
     // Allocate space for mapping
     fb.errors.task.values.resize(std::get<0>(e).size());
