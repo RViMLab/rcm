@@ -109,14 +109,24 @@ int main(int argc, char** argv) {
     // joint_values[5]  = -1.28641787;
     // joint_values[6]  = 2.528927791;
 
-    // four dof 2nd working state
-    joint_values[0] = 0.256105521;
-    joint_values[1] = 0.933970489;
-    joint_values[2] = 0.040256433;
-    joint_values[3] = -1.88558966;
-    joint_values[4] = 1.448267325;
-    joint_values[5] = 1.558980503;
-    joint_values[6] = -2.06240635;
+    // // four dof 2nd working state
+    // joint_values[0] = 0.256105521;
+    // joint_values[1] = 0.933970489;
+    // joint_values[2] = 0.040256433;
+    // joint_values[3] = -1.88558966;
+    // joint_values[4] = 1.448267325;
+    // joint_values[5] = 1.558980503;
+    // joint_values[6] = -2.06240635;
+
+
+    // real setup state
+    joint_values[0] = -0.20896689;
+    joint_values[1] =  1.06477567;
+    joint_values[2] =  0.01828840;
+    joint_values[3] = -1.19474063;
+    joint_values[4] =  1.42256009;
+    joint_values[5] =  1.65311512;
+    joint_values[6] = -1.36357523;
 
     move_group.setJointValueTarget(joint_values);
     move_group.move();
