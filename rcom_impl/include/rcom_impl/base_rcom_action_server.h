@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <deque>
 #include <Eigen/Core>
 
 #include <ros/ros.h>
@@ -21,6 +22,8 @@
 
 namespace rcom
 {
+
+using TaskDeque = std::deque<std::tuple<double, Eigen::VectorXd>>;
 
 class BaseRCoMActionServer {
     public:
@@ -64,6 +67,10 @@ class BaseRCoMActionServer {
         Eigen::VectorXd _t_td_scale;
         int _max_iter;
 
+        // Buffer for previous tasks for velocity
+        int _t_deque_size;
+        TaskDeque _t_deque;  // (time, task) buffer
+
         // Goal callback, state machine
         void _goalCB(const rcom_msgs::rcomGoalConstPtr& goal);
 
@@ -75,12 +82,13 @@ class BaseRCoMActionServer {
 
         // Compute error between current and desired values via forward kinematics
         virtual Eigen::VectorXd _computeTaskForwardKinematics(std::vector<double>& q) = 0;
+        bool _computeTaskVelocity(TaskDeque& task_deque, Eigen::VectorXd& t_velocity);
 
         // Transform task
         virtual Eigen::VectorXd _transformTask(Eigen::VectorXd& td);
 
         // Update joint angles
-        virtual std::vector<double> _computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
+        virtual std::vector<double> _computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar, bool is_velocity=false);
 
         std::tuple<Eigen::Vector3d, Eigen::Vector3d> _computeRCoMForwardKinematics(std::vector<double>& q);
 
@@ -113,6 +121,9 @@ class BaseRCoMActionServer {
         // State machines
         actionlib::SimpleClientGoalState _positionControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
         actionlib::SimpleClientGoalState _velocityControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar);
+
+        // Append deque
+        bool _appendTaskDeque(double time, std::vector<double>& q);
 };
 
 
@@ -138,7 +149,8 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     _move_group(planning_group),
     _link_pi(link_pi),
     _link_pip1(link_pip1),
-    _t1_td(t1_td), _t1_p_trocar(t1_p_trocar), _t2_td(t2_td), _t2_p_trocar(t2_p_trocar), _t_td_scale(Eigen::Map<Eigen::VectorXd>(t_td_scale.data(), t_td_scale.size())), _max_iter(max_iter) {    
+    _t1_td(t1_td), _t1_p_trocar(t1_p_trocar), _t2_td(t2_td), _t2_p_trocar(t2_p_trocar), _t_td_scale(Eigen::Map<Eigen::VectorXd>(t_td_scale.data(), t_td_scale.size())), _max_iter(max_iter), 
+    _t_deque_size(2)    {    
     
     _as.start();
     _move_group.setMaxVelocityScalingFactor(alpha);
@@ -217,13 +229,27 @@ void BaseRCoMActionServer::_timerCB(const ros::TimerEvent&) {
 }
 
 
+bool BaseRCoMActionServer::_computeTaskVelocity(TaskDeque& task_deque, Eigen::VectorXd& t_vel) {
+    // Compute task velocity from last two entries of task deque
+    auto dt = std::get<0>(_t_deque[_t_deque.size() - 1]) - std::get<0>(_t_deque[_t_deque.size() - 2]);
+    if (dt == 0.) {
+        t_vel.setZero();
+        return false;
+    }
+    else {
+        t_vel = (std::get<1>(_t_deque[_t_deque.size() - 1]) - std::get<1>(_t_deque[_t_deque.size() - 2])) / dt;
+        return true;
+    }
+}
+
+
 Eigen::VectorXd BaseRCoMActionServer::_transformTask(Eigen::VectorXd& td) {
     // Can be used to transform the task
     return td;
 }
 
 
-std::vector<double> BaseRCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) {
+std::vector<double> BaseRCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Eigen::Vector3d p_trocar, bool is_velocity) {
     
     // Compute Jacobians and positions of robot model at current pose
     auto robot_state = _move_group.getCurrentState();
@@ -254,7 +280,18 @@ std::vector<double> BaseRCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Ei
     if (!computed) return q;
 
     Eigen::MatrixXd Jt = _computeTaskJacobian(robot_state);
-    Eigen::VectorXd t = _computeTaskForwardKinematics(q);
+    Eigen::VectorXd t;
+    if (is_velocity) {
+        if (_t_deque.size() == _t_deque_size) {
+            if (!_computeTaskVelocity(_t_deque, t)) {
+                return q;
+            };
+        }
+        else return q;
+    }
+    else {
+        t = _computeTaskForwardKinematics(q);
+    }
 
     Ji   = Ji.topRows(3);  // get translational part of Jacobian
     Jip1 = Jip1.topRows(3);
@@ -432,8 +469,8 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
             return actionlib::SimpleClientGoalState::PREEMPTED;
         }
 
-        // Compute joint angles that satisfy desired positions
-        auto q = _computeUpdate(td, p_trocar);
+        // Compute joint angles that satisfy desired task
+        auto q = _computeUpdate(td, p_trocar, false);
         auto p = _computeRCoMForwardKinematics(q);
         auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
         auto t = _computeTaskForwardKinematics(q);
@@ -502,30 +539,34 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
         return actionlib::SimpleClientGoalState::PREEMPTED;
     }
 
-    auto dtd = td;  // safe velocity task
+    auto q = _move_group.getCurrentJointValues();
+    auto time = ros::Time::now().toSec();
 
-    // Convert velocity task to position task
-    auto q = _move_group.getCurrentJointValues();  // introduces drift without feedback
-    auto t = _computeTaskForwardKinematics(q);
-    td = t + _rcom.getdt()*dtd;
+    if (!_appendTaskDeque(time, q)) {
+        _as.setPreempted();
+        return actionlib::SimpleClientGoalState::REJECTED;  // exit if buffer hasn't enough values
+    }
 
-    // Compute joint angles that satisfy desired positions
-    q = _computeUpdate(td, p_trocar);
+    // Compute joint angles that satisfy desired task
+    q = _computeUpdate(td, p_trocar, true);
     auto p = _computeRCoMForwardKinematics(q);
     auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
-    auto robot_state = _move_group.getCurrentState();
-    auto dq = _computeJointVelocities(robot_state);
-    Eigen::VectorXd dt = _computeTaskJacobian(robot_state)*dq;  // compute task velocity via task Jacobian, Jdq = dt
-    auto e = _computeError(dtd, dt, p_trocar, prcm);
+    Eigen::VectorXd t;
+    if (!_computeTaskVelocity(_t_deque, t)) {
+        ROS_WARN("%s: Goal requested at too high rate", _action_server.c_str());
+        _as.setPreempted();
+        return actionlib::SimpleClientGoalState::REJECTED;
+    };
+    auto e = _computeError(td, t, p_trocar, prcm);
 
     if (std::get<0>(e).norm() > _t1_td) {
-        auto ss = _streamState(dtd, dt, p_trocar, prcm, e);
+        auto ss = _streamState(td, t, p_trocar, prcm, e);
         ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
         _as.setAborted();
         return actionlib::SimpleClientGoalState::REJECTED;
     } 
     else if (std::get<1>(e).norm() > _t1_p_trocar) {
-        auto ss = _streamState(dtd, dt, p_trocar, prcm, e);
+        auto ss = _streamState(td, t, p_trocar, prcm, e);
         ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
         _as.setAborted();
         return actionlib::SimpleClientGoalState::REJECTED;
@@ -534,21 +575,30 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
         auto status = _executeGoal(q, false);  // don't wait for execution to finish
 
         if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
-            q = _move_group.getCurrentJointValues();
-            p = _computeRCoMForwardKinematics(q);
-            prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
-            robot_state = _move_group.getCurrentState();
-            dq = _computeJointVelocities(robot_state);
-            dt = _computeTaskJacobian(robot_state)*dq;  // compute task velocity via task Jacobian, Jdq = dt
-            e = _computeError(dtd, dt, p_trocar, prcm);
+            // q = _move_group.getCurrentJointValues();
+            // time = ros::Time::now().toSec();
+
+            // p = _computeRCoMForwardKinematics(q);
+            // prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+            // if (!_appendTaskDeque(time, q)) {
+            //     ROS_INFO("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
+            //     _as.setAborted();
+            //     return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
+            // }
+            // if (!_computeTaskVelocity(_t_deque, t)) {
+            //     ROS_INFO("%s: Aborted due to frequency limit", _action_server.c_str());
+            //     _as.setAborted();
+            //     return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
+            // };
+            // e = _computeError(td, t, p_trocar, prcm);
 
             // Update lambda to remove drift
             _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
-            auto ss = _streamState(dtd, dt, p_trocar, prcm, e);
+            auto ss = _streamState(td, t, p_trocar, prcm, e);
             ROS_INFO("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
-            auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, dt, prcm, true);  // TODO: update feedback
-            auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, dt, prcm, true);
+            auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, true);
+            auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm, true);
             _as.publishFeedback(fb);
             _as.setSucceeded(rs);
             return actionlib::SimpleClientGoalState::SUCCEEDED;
@@ -559,6 +609,19 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
             return actionlib::SimpleClientGoalState::ABORTED;
         }
     }
+};
+
+
+bool BaseRCoMActionServer::_appendTaskDeque(double time, std::vector<double>& q) {
+    auto t = _computeTaskForwardKinematics(q);
+
+    // Log task for task velocity computation
+    _t_deque.push_back(std::make_tuple(time, t));
+    if (_t_deque.size() > _t_deque_size) {
+        _t_deque.pop_front();
+        return true;
+    }
+    return false;
 };
 
 
