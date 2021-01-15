@@ -57,76 +57,14 @@ int main(int argc, char** argv) {
     // Set an initial pose, corresponding to p_trocar
     auto joint_values = move_group.getCurrentJointValues();
 
-    // joint_values[1] = -1.0*M_PI/4.;
-    // joint_values[3] = -2.0*M_PI/2.;
-    // joint_values[5] = +1.0*M_PI/4.;
-
-    // joint_values[1] = 1.0*M_PI/4.;
-    // joint_values[2] = 1.0*M_PI/4.;
-    // joint_values[3] = 2.0*M_PI/4.;
-    // joint_values[4] = 1.0*M_PI/4.;
-    // joint_values[5] = 1.0*M_PI/4.;
-    // joint_values[6] = 1.0*M_PI/4.;
-
-    // joint_values[0]  = - 85.15*M_PI/180.;
-    // joint_values[1]  = - 41.71*M_PI/180.;
-    // joint_values[2]  =    0.79*M_PI/180.;
-    // joint_values[3]  =   78.44*M_PI/180.;
-    // joint_values[4]  = - 50.62*M_PI/180.;
-    // joint_values[5]  = - 20.25*M_PI/180.;
-    // joint_values[6]  = - 15.22*M_PI/180.;
-
-    // joint_values[0]  = - 1.1784;
-    // joint_values[1]  =   1.0322;
-    // joint_values[2]  = - 0.0233;
-    // joint_values[3]  = - 1.3586;
-    // joint_values[4]  = - 1.6409;
-    // joint_values[5]  = - 1.6744;
-    // joint_values[6]  =   1.4576;
-
-    // joint_values[0] = -0.0225921;
-    // joint_values[1] = -0.0948019;
-    // joint_values[2] =  0.0266029;
-    // joint_values[3] =  0.9266743;
-    // joint_values[4] = -0.0062513;
-    // joint_values[5] = -1.2412048;
-    // joint_values[6] =  0.0036204;
-
-    // joint_values[0]  =  0.4422;
-    // joint_values[1]  = -1.6297;
-    // joint_values[2]  = -1.5751;
-    // joint_values[3]  = -0.6265;
-    // joint_values[4]  =  0.0230;
-    // joint_values[5]  =  0.4897;
-    // joint_values[6]  = -0.8020;
-
-    // // four dof 1st working state
-    // joint_values[0]  = -0.33733746;
-    // joint_values[1]  = 1.728767731;
-    // joint_values[2]  = 1.618171017;
-    // joint_values[3]  = -1.74159249;
-    // joint_values[4]  = 2.931950011; 
-    // joint_values[5]  = -1.28641787;
-    // joint_values[6]  = 2.528927791;
-
-    // // four dof 2nd working state
-    // joint_values[0] = 0.256105521;
-    // joint_values[1] = 0.933970489;
-    // joint_values[2] = 0.040256433;
-    // joint_values[3] = -1.88558966;
-    // joint_values[4] = 1.448267325;
-    // joint_values[5] = 1.558980503;
-    // joint_values[6] = -2.06240635;
-
-
-    // real setup state
-    joint_values[0] = -0.20896689;
-    joint_values[1] =  1.06477567;
-    joint_values[2] =  0.01828840;
-    joint_values[3] = -1.19474063;
-    joint_values[4] =  1.42256009;
-    joint_values[5] =  1.65311512;
-    joint_values[6] = -1.36357523;
+    // initial state
+    joint_values[0] =  0.79396429;
+    joint_values[1] =  1.76694670;
+    joint_values[2] = -1.56914485;
+    joint_values[3] = -1.04951022;
+    joint_values[4] =  0.76358239;
+    joint_values[5] = -0.66000193;
+    joint_values[6] =  1.67966506;
 
     move_group.setJointValueTarget(joint_values);
     move_group.move();

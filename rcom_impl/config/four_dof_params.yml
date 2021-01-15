@@ -3,10 +3,10 @@ control_client: 'PositionJointInterface_trajectory_controller/follow_joint_traje
 planning_group: 'arm_endoscope'
 
 # task and remote center of motion gains - proportional, integral, differential
-kpt: [0.2,0.2,0.2,0.2]
+kpt: [0.04,0.04,0.04,0.04]
 kit: [0.,0.,0.,0.]
 kdt: [0.,0.,0.,0.]
-kprcm: [80., 80., 80.]
+kprcm: [100., 100., 100.]
 kircm: [0., 0., 0.]
 kdrcm: [0., 0., 0.]
 lambda0: 0.7
