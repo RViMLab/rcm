@@ -19,7 +19,7 @@ alpha: 0.1
 
 # link names
 link_pi: 'storz_endoscope_link_1'
-link_pip1: 'storz_endoscope_link_cm'
+link_pip1: 'storz_endoscope_link_cm_optical'
 
 # threshold 1, divergence check prior to execution
 t1_td: 10.0
