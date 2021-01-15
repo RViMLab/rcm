@@ -353,6 +353,8 @@ Eigen::VectorXd BaseRCoMActionServer::_computeJointVelocities(moveit::core::Robo
 
 
 actionlib::SimpleClientGoalState BaseRCoMActionServer::_executeGoal(std::vector<double> q, bool wait_for_result) {
+
+    // See for example http://wiki.ros.org/pr2_controllers/Tutorials/Moving%20the%20arm%20using%20the%20Joint%20Trajectory%20Action
     
     // Execute motion on client
     trajectory_msgs::JointTrajectoryPoint point;
@@ -575,22 +577,22 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
         auto status = _executeGoal(q, false);  // don't wait for execution to finish
 
         if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
-            // q = _move_group.getCurrentJointValues();
-            // time = ros::Time::now().toSec();
+            q = _move_group.getCurrentJointValues();
+            time = ros::Time::now().toSec();
 
-            // p = _computeRCoMForwardKinematics(q);
-            // prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
-            // if (!_appendTaskDeque(time, q)) {
-            //     ROS_INFO("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
-            //     _as.setAborted();
-            //     return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
-            // }
-            // if (!_computeTaskVelocity(_t_deque, t)) {
-            //     ROS_INFO("%s: Aborted due to frequency limit", _action_server.c_str());
-            //     _as.setAborted();
-            //     return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
-            // };
-            // e = _computeError(td, t, p_trocar, prcm);
+            p = _computeRCoMForwardKinematics(q);
+            prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+            if (!_appendTaskDeque(time, q)) {
+                ROS_INFO("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
+                _as.setAborted();
+                return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
+            }
+            if (!_computeTaskVelocity(_t_deque, t)) {
+                ROS_INFO("%s: Aborted due to frequency limit", _action_server.c_str());
+                _as.setAborted();
+                return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
+            };
+            e = _computeError(td, t, p_trocar, prcm);
 
             // Update lambda to remove drift
             _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
