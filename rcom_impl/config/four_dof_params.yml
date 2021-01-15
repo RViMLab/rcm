@@ -3,13 +3,12 @@ control_client: 'PositionJointInterface_trajectory_controller/follow_joint_traje
 planning_group: 'arm_endoscope'
 
 # task and remote center of motion gains - proportional, integral, differential
-kpt: [1.,1.,1.,1.]
-kit: [0.0,0.0,0.0,0.0]
-kdt: [0.0,0.0,0.0,0.0]
-# 1st config kprcm: [10., 10., 10.]
-kprcm: [10., 10., 10.]
-kircm: [0.0, 0.0, 0.0]
-kdrcm: [0.0, 0.0, 0.0]
+kpt: [0.2,0.2,0.2,0.2]
+kit: [0.,0.,0.,0.]
+kdt: [0.,0.,0.,0.]
+kprcm: [80., 80., 80.]
+kircm: [0., 0., 0.]
+kdrcm: [0., 0., 0.]
 lambda0: 0.7
 
 # control interval, in velocity control: rate at which rcom goals are sent, else: sets interval to execute incremental motion
@@ -34,4 +33,4 @@ t2_p_trocar: 0.001
 t_td_scale: [1.0, 1.0, 1.0, 0.1]
 
 # max number of iterations
-max_iter: 20
+max_iter: 500
