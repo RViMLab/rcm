@@ -28,6 +28,9 @@ class FourDoFRCoMActionServer : BaseRCoMActionServer {
 
         // Compute error between current and desired values via forward kinematics
         virtual Eigen::VectorXd _computeTaskForwardKinematics(std::vector<double>& q) override;
+
+        // Transform the task from camera to world frame
+        virtual Eigen::VectorXd _transformTask(Eigen::VectorXd& td) override;
 };
 
 
@@ -57,7 +60,7 @@ Eigen::MatrixXd FourDoFRCoMActionServer::_computeTaskJacobian(moveit::core::Robo
         Jt
     );
 
-    return Jt.topRows(4);
+    return Jt;
 };
 
 
@@ -74,10 +77,31 @@ Eigen::VectorXd FourDoFRCoMActionServer::_computeTaskForwardKinematics(std::vect
     double r, p, y;
     rot.getRPY(r, p, y);
 
-    Eigen::VectorXd t(4); 
-    t << robot_state.getGlobalLinkTransform(_link_pip1).translation(), r;
+    Eigen::VectorXd t(6); 
+    t << robot_state.getGlobalLinkTransform(_link_pip1).translation(), r, p, y;
 
     return t;
 };
+
+
+Eigen::VectorXd FourDoFRCoMActionServer::_transformTask(Eigen::VectorXd& td) {
+
+    auto robot_state = _move_group.getCurrentState();
+
+    if (td.size() != 4) throw std::invalid_argument("Size of desired task must equal 4.");
+
+    // Set pitch and yaw to zero
+    Eigen::VectorXd t(6);
+    t << td, 0., 0.;  // controls roll of camera, assumes x-axis as optical axis
+
+    // Rotate task from camera frame to world frame
+    Eigen::MatrixXd R(6, 6);
+    R << robot_state->getGlobalLinkTransform(_link_pip1).rotation(), Eigen::Matrix3d::Zero(),
+        Eigen::Matrix3d::Zero(), robot_state->getGlobalLinkTransform(_link_pip1).rotation();
+
+    t = R*t;
+    return t;
+};
+
 
 } // namespace rcom
