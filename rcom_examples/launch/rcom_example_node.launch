@@ -1,0 +1,10 @@
+<launch>
+    <!-- launch robot with endoscope -->
+    <include file="$(find lbr_storz_endoscope_moveit)/launch/moveit_planning_execution.launch"/>
+
+    <!-- launch remote center of motion action server -->
+    <include file="$(find rcom_impl)/launch/three_dof_rcom.launch"/> 
+
+    <!-- execute task via action client -->
+    <node pkg="rcom_examples" name="rcom_example_node" type="rcom_example_node.py" ns="lbr" output="screen"/>
+</launch>
