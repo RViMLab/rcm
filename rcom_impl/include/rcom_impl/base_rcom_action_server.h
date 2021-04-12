@@ -202,11 +202,11 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
     // State machines
     if (goal->states.task.is_velocity) {  // Handle task velocity goal
         _velocityControlStateMachine(td, p_trocar);
+        // _positionBasedVelocityControlStateMachine(td, p_trocar);
         return;
     }
     if (!goal->states.task.is_velocity){  // Handle task position goal
-        // _positionControlStateMachine(td, p_trocar);
-        _positionBasedVelocityControlStateMachine(td, p_trocar);
+        _positionControlStateMachine(td, p_trocar);
         return;
     }
 }
@@ -632,7 +632,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionBasedVelocityCon
     td = t + _rcom.getdt()*dtd;
 
     // Compute joint angles that satisfy desired positions
-    q = _computeUpdate(td, p_trocar);
+    q = _computeUpdate(td, p_trocar, false);
     auto p = _computeRCoMForwardKinematics(q);
     auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
     auto robot_state = _move_group.getCurrentState();
