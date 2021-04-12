@@ -2,6 +2,7 @@
 
 #include <tf/tf.h>
 #include <tf_conversions/tf_eigen.h>
+#include <eigen3/unsupported/Eigen/EulerAngles>
 
 #include <rcom_impl/base_rcom_action_server.h>
 
@@ -28,9 +29,6 @@ class FourDoFRCoMActionServer : BaseRCoMActionServer {
 
         // Compute error between current and desired values via forward kinematics
         virtual Eigen::VectorXd _computeTaskForwardKinematics(std::vector<double>& q) override;
-
-        // Transform the task from camera to world frame
-        virtual Eigen::VectorXd _transformTask(Eigen::VectorXd& td) override;
 };
 
 
@@ -60,7 +58,17 @@ Eigen::MatrixXd FourDoFRCoMActionServer::_computeTaskJacobian(moveit::core::Robo
         Jt
     );
 
-    return Jt;
+
+    // Rotate task from world frame to camera frame
+    Eigen::MatrixXd R(6, 6);
+    R << robot_state->getGlobalLinkTransform(_link_pip1).rotation().inverse(), Eigen::Matrix3d::Zero(),
+        Eigen::Matrix3d::Zero(), robot_state->getGlobalLinkTransform(_link_pip1).rotation().inverse();
+
+    Eigen::MatrixXd proj = Eigen::MatrixXd::Zero(4, 6);
+    proj.topLeftCorner(3, 3) = Eigen::Matrix3d::Identity();
+    proj(3, 5) = 1.;
+
+    return proj*R*Jt;
 };
 
 
@@ -72,36 +80,13 @@ Eigen::VectorXd FourDoFRCoMActionServer::_computeTaskForwardKinematics(std::vect
 
     robot_state.setJointGroupPositions(robot_state.getJointModelGroup(_move_group.getName()), q);
 
-    tf::Matrix3x3 rot;
-    tf::matrixEigenToTF(robot_state.getGlobalLinkTransform(_link_pip1).rotation(), rot);
-    double r, p, y;
-    rot.getRPY(r, p, y);
+    // https://eigen.tuxfamily.org/dox/unsupported/classEigen_1_1EulerAngles.html
+    auto R = robot_state.getGlobalLinkTransform(_link_pip1).rotation();
+    auto euler = Eigen::EulerAnglesZXZd(R);
 
-    Eigen::VectorXd t(6); 
-    t << robot_state.getGlobalLinkTransform(_link_pip1).translation(), r, p, y;
-
+    Eigen::VectorXd t(4); 
+    t << robot_state.getGlobalLinkTransform(_link_pip1).translation(), euler.gamma();
     return t;
 };
-
-
-Eigen::VectorXd FourDoFRCoMActionServer::_transformTask(Eigen::VectorXd& td) {
-
-    auto robot_state = _move_group.getCurrentState();
-
-    if (td.size() != 4) throw std::invalid_argument("Size of desired task must equal 4.");
-
-    // Set pitch and yaw to zero
-    Eigen::VectorXd t(6);
-    t << td, 0., 0.;  // controls roll of camera, assumes x-axis as optical axis
-
-    // Rotate task from camera frame to world frame
-    Eigen::MatrixXd R(6, 6);
-    R << robot_state->getGlobalLinkTransform(_link_pip1).rotation(), Eigen::Matrix3d::Zero(),
-        Eigen::Matrix3d::Zero(), robot_state->getGlobalLinkTransform(_link_pip1).rotation();
-
-    t = R*t;
-    return t;
-};
-
 
 } // namespace rcom
