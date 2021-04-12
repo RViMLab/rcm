@@ -231,7 +231,7 @@ void BaseRCoMActionServer::_timerCB(const ros::TimerEvent&) {
 
 bool BaseRCoMActionServer::_computeTaskVelocity(TaskDeque& task_deque, Eigen::VectorXd& t_vel) {
     // Compute task velocity from last two entries of task deque
-    auto dt = std::get<0>(_t_deque[_t_deque.size() - 1]) - std::get<0>(_t_deque[_t_deque.size() - 2]);
+    auto dt = (std::get<0>(_t_deque[_t_deque.size() - 1]) - std::get<0>(_t_deque[_t_deque.size() - 2]))/1.e9;  // ns -> s
     if (dt == 0.) {
         t_vel.setZero();
         return false;
@@ -480,13 +480,13 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
 
         if (std::get<0>(e).norm() > _t1_td) {
             auto ss = _streamState(td, t, p_trocar, prcm, e);
-            ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+            ROS_WARN("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             _as.setAborted();
             return actionlib::SimpleClientGoalState::REJECTED;
         } 
         else if (std::get<1>(e).norm() > _t1_p_trocar) {
             auto ss = _streamState(td, t, p_trocar, prcm, e);
-            ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+            ROS_WARN("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             _as.setAborted();
             return actionlib::SimpleClientGoalState::REJECTED;
         }
@@ -505,7 +505,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
 
                 if (std::get<0>(e).norm() <= _t2_td && std::get<1>(e).norm() <= _t2_p_trocar ) {
                     auto ss = _streamState(td, t, p_trocar, prcm, e);
-                    ROS_INFO("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+                    ROS_DEBUG("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, false);
                     auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm, false);
                     _as.publishFeedback(fb);
@@ -514,13 +514,13 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
                 }
                 else {
                     auto ss = _streamState(td, t, p_trocar, prcm, e);
-                    ROS_INFO("%s: Iterating on joint angles\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+                    ROS_DEBUG("%s: Iterating on joint angles\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
                     auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, false);
                     _as.publishFeedback(fb);
                 }
             }
             else {
-                ROS_INFO("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
+                ROS_ERROR("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
                 _as.setAborted();
                 return actionlib::SimpleClientGoalState::ABORTED;
             }
@@ -536,13 +536,13 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionControlStateMach
 actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMachine(Eigen::VectorXd& td, Eigen::Vector3d p_trocar) {
 
     if (_as.isPreemptRequested() || !ros::ok()) {
-        ROS_INFO("%s: Preempted", _action_server.c_str());
+        ROS_DEBUG("%s: Preempted", _action_server.c_str());
         _as.setPreempted();
         return actionlib::SimpleClientGoalState::PREEMPTED;
     }
 
     auto q = _move_group.getCurrentJointValues();
-    auto time = ros::Time::now().toSec();
+    auto time = ros::Time::now().toNSec();
 
     if (!_appendTaskDeque(time, q)) {
         _as.setPreempted();
@@ -563,13 +563,13 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
 
     if (std::get<0>(e).norm() > _t1_td) {
         auto ss = _streamState(td, t, p_trocar, prcm, e);
-        ROS_INFO("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+        ROS_WARN("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
         _as.setAborted();
         return actionlib::SimpleClientGoalState::REJECTED;
     } 
     else if (std::get<1>(e).norm() > _t1_p_trocar) {
         auto ss = _streamState(td, t, p_trocar, prcm, e);
-        ROS_INFO("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+        ROS_WARN("%s: Aborted due to divergent RCoM\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
         _as.setAborted();
         return actionlib::SimpleClientGoalState::REJECTED;
     }
@@ -578,17 +578,17 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
 
         if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
             q = _move_group.getCurrentJointValues();
-            time = ros::Time::now().toSec();
+            time = ros::Time::now().toNSec();
 
             p = _computeRCoMForwardKinematics(q);
             prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
             if (!_appendTaskDeque(time, q)) {
-                ROS_INFO("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
+                ROS_WARN("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
                 _as.setAborted();
                 return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
             }
             if (!_computeTaskVelocity(_t_deque, t)) {
-                ROS_INFO("%s: Aborted due to frequency limit", _action_server.c_str());
+                ROS_WARN("%s: Aborted due to frequency limit", _action_server.c_str());
                 _as.setAborted();
                 return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
             };
@@ -598,7 +598,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
             _rcom.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
             auto ss = _streamState(td, t, p_trocar, prcm, e);
-            ROS_INFO("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+            ROS_DEBUG("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
             auto fb = _computeFeedback<rcom_msgs::rcomFeedback>(e, t, prcm, true);
             auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm, true);
             _as.publishFeedback(fb);
@@ -606,7 +606,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
             return actionlib::SimpleClientGoalState::SUCCEEDED;
         }
         else {
-            ROS_INFO("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
+            ROS_ERROR("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
             _as.setAborted();
             return actionlib::SimpleClientGoalState::ABORTED;
         }
