@@ -57,7 +57,9 @@ Eigen::MatrixXd ThreeDoFRCoMActionServer::_computeTaskJacobian(moveit::core::Rob
         Jt
     );
 
-    return Jt.topRows(3);
+    auto R = robot_state->getGlobalLinkTransform(_link_pip1).rotation().inverse();
+
+    return R*Jt.topRows(3);
 };
 
 
