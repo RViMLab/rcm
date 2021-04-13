@@ -9,15 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 # Generate custom messages
 add_message_files(
-    FILES p_trocar.msg
-)
-
-add_message_files(
-    FILES rcom.msg
-)
-
-add_message_files(
-    FILES task.msg
+    FILES p_trocar.msg rcom.msg task.msg
 )
 
 add_action_files(
