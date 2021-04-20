@@ -282,14 +282,9 @@ std::vector<double> BaseRCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Ei
     if (!computed) return q;
 
     Eigen::MatrixXd Jt = _computeTaskJacobian(robot_state);
-    Eigen::VectorXd t;
+    Eigen::VectorXd t(td.size());
     if (is_velocity) {
-        if (_t_deque.size() == _t_deque_size) {
-            if (!_computeTaskVelocity(_t_deque, t)) {
-                return q;
-            };
-        }
-        else return q;
+        t.setZero();
     }
     else {
         t = _computeTaskForwardKinematics(q);
@@ -543,25 +538,12 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
         return actionlib::SimpleClientGoalState::PREEMPTED;
     }
 
-    auto q = _move_group.getCurrentJointValues();
-    auto time = ros::Time::now().toNSec();
-
-    if (!_appendTaskDeque(time, q)) {
-        _as.setPreempted();
-        return actionlib::SimpleClientGoalState::REJECTED;  // exit if buffer hasn't enough values
-    }
-
     // Compute joint angles that satisfy desired task
-    q = _computeUpdate(td, p_trocar, true);
+    auto q = _computeUpdate(td, p_trocar, true);
     auto p = _computeRCoMForwardKinematics(q);
     auto prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
-    Eigen::VectorXd t;
-    if (!_computeTaskVelocity(_t_deque, t)) {
-        ROS_WARN("%s: Goal requested at too high rate", _action_server.c_str());
-        _as.setPreempted();
-        return actionlib::SimpleClientGoalState::REJECTED;
-    };
-    auto e = _computeError(td, t, p_trocar, prcm);
+    Eigen::VectorXd t = Eigen::VectorXd::Zero(td.size());
+    auto e = _computeError(td, t, p_trocar, prcm);  // max vel error
 
     if (std::get<0>(e).norm() > _t1_td) {
         auto ss = _streamState(td, t, p_trocar, prcm, e);
@@ -580,17 +562,17 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
 
         if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
             q = _move_group.getCurrentJointValues();
-            time = ros::Time::now().toNSec();
-
-            p = _computeRCoMForwardKinematics(q);
-            prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
+            auto time = ros::Time::now().toNSec();
             if (!_appendTaskDeque(time, q)) {
-                ROS_WARN("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
+                ROS_DEBUG("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
                 _as.setAborted();
                 return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
             }
+
+            p = _computeRCoMForwardKinematics(q);
+            prcm = _rcom.computePRCoM(std::get<0>(p), std::get<1>(p));
             if (!_computeTaskVelocity(_t_deque, t)) {
-                ROS_WARN("%s: Aborted due to frequency limit", _action_server.c_str());
+                ROS_DEBUG("%s: Aborted due to frequency limit", _action_server.c_str());
                 _as.setAborted();
                 return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
             };
