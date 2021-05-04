@@ -40,7 +40,7 @@ class BaseRCoMActionServer {
     protected:
         ros::NodeHandle _nh;
 
-        // Server to handle goals via _computeUpdateCB callback
+        // Server to handle goals via _goalCB callback
         std::string _action_server;
         actionlib::SimpleActionServer<rcom_msgs::rcomAction> _as;
 
@@ -152,8 +152,11 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     _link_pip1(link_pip1),
     _t1_td(t1_td), _t1_p_trocar(t1_p_trocar), _t2_td(t2_td), _t2_p_trocar(t2_p_trocar), _t_td_scale(Eigen::Map<Eigen::VectorXd>(t_td_scale.data(), t_td_scale.size())), _max_iter(max_iter), 
     _t_deque_size(2)    {    
-    
+
     _as.start();
+    ROS_INFO("BaseRCoMActionServer: Waiting for action server under %s...", control_client.c_str());
+    _ac.waitForServer();
+    ROS_INFO("Done.");
     _move_group.setMaxVelocityScalingFactor(alpha);
 
     // enable dynamics copying for velocity extraction from move_group https://github.com/ros-planning/moveit_ros/pull/622
