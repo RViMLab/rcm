@@ -545,6 +545,12 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_velocityControlStateMach
     Eigen::VectorXd t = Eigen::VectorXd::Zero(td.size());
     auto e = _computeError(td, t, p_trocar, prcm);  // max vel error
 
+    if (td.isZero()) {
+        auto rs = _computeFeedback<rcom_msgs::rcomResult>(e, t, prcm, true);
+        _as.setSucceeded(rs);
+        return actionlib::SimpleClientGoalState::SUCCEEDED;
+    }
+
     if (std::get<0>(e).norm() > _t1_td) {
         auto ss = _streamState(td, t, p_trocar, prcm, e);
         ROS_WARN("%s: Aborted due to divergent task\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
