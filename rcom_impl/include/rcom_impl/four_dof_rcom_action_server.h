@@ -17,7 +17,7 @@ class FourDoFRCoMActionServer : BaseRCoMActionServer {
             std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt,
             std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-            double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
+            double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter, double exp_smooth
         );
 
     private:
@@ -35,13 +35,13 @@ FourDoFRCoMActionServer::FourDoFRCoMActionServer(
     std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt,
     std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-    double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter
+    double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter, double exp_smooth
 ) : BaseRCoMActionServer(
     nh, action_server, control_client, 
     kpt, kit, kdt, 
     kprcm, kircm, kdrcm, lambda0, dt, 
     planning_group, alpha, link_pi, link_pip1, 
-    t1_td, t1_p_trocar, t2_td, t2_p_trocar, t_td_scale, max_iter) {   };
+    t1_td, t1_p_trocar, t2_td, t2_p_trocar, t_td_scale, max_iter, exp_smooth) {   };
 
 
 Eigen::MatrixXd FourDoFRCoMActionServer::_computeTaskJacobian(moveit::core::RobotStatePtr robot_state) {

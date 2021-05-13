@@ -23,6 +23,7 @@ int main(int argc, char** argv) {
     double t1_td, t1_p_trocar, t2_td, t2_p_trocar;
     std::vector<double> t_td_scale;
     int max_iter;
+    double exp_smooth;
 
     nh.getParam("action_server", action_server);
     nh.getParam("control_client", control_client);
@@ -44,10 +45,11 @@ int main(int argc, char** argv) {
     nh.getParam("t2_td", t2_td);
     nh.getParam("t2_p_trocar", t2_p_trocar);
     nh.getParam("max_iter", max_iter);
+    nh.getParam("exp_smooth", exp_smooth);
 
     // Initialize position
     auto move_group = moveit::planning_interface::MoveGroupInterface(planning_group);
-    move_group.setMaxVelocityScalingFactor(1.0);
+    move_group.setMaxVelocityScalingFactor(0.01);
 
     // Go home
     move_group.setNamedTarget("home");
@@ -76,7 +78,7 @@ int main(int argc, char** argv) {
         nh, action_server, control_client,
         kpt, kit, kdt, kprcm, kircm, kdrcm, lambda0, dt,
         planning_group, alpha, link_pi, link_pip1,
-        t1_td, t1_p_trocar, t2_td, t2_p_trocar, t_td_scale, max_iter    
+        t1_td, t1_p_trocar, t2_td, t2_p_trocar, t_td_scale, max_iter, exp_smooth
     );
 
     ros::waitForShutdown();

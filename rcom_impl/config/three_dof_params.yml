@@ -34,3 +34,6 @@ t_td_scale: [1.0, 1.0, 1.0]
 
 # max number of iterations
 max_iter: 20
+
+# exponential smoothing in [0, 1]
+exp_smooth: 1.0  # 1.0 means no smoothing is applied
