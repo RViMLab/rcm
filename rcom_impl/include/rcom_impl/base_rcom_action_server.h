@@ -32,7 +32,8 @@ class BaseRCoMActionServer {
             std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt,
             std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-            double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter, double exp_smooth
+            double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter, 
+            double exp_smooth, double dumping
         );
 
         ~BaseRCoMActionServer();
@@ -74,6 +75,9 @@ class BaseRCoMActionServer {
         // Exponential smoothing, previous joint update
         Eigen::VectorXd _dq_im1;
         double _exp_smooth;
+
+        // Dumping factor for pseudo inverse
+        double _dumping;
 
         // Goal callback, state machine
         void _goalCB(const rcom_msgs::rcomGoalConstPtr& goal);
@@ -137,7 +141,8 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     std::vector<double> kpt, std::vector<double> kit, std::vector<double> kdt,
     std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
-    double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter, double exp_smooth
+    double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter, 
+    double exp_smooth, double dumping
 ) : _action_server(action_server), _as(nh, action_server, boost::bind(&BaseRCoMActionServer::_goalCB, this, _1), false),
     _control_client(control_client), _ac(nh, control_client, false),
     _rcom(
@@ -157,7 +162,8 @@ BaseRCoMActionServer::BaseRCoMActionServer(
     _t1_td(t1_td), _t1_p_trocar(t1_p_trocar), _t2_td(t2_td), _t2_p_trocar(t2_p_trocar), _t_td_scale(Eigen::Map<Eigen::VectorXd>(t_td_scale.data(), t_td_scale.size())), _max_iter(max_iter), 
     _t_deque_size(2),
     _dq_im1(_move_group.getActiveJoints().size()),
-    _exp_smooth(exp_smooth)   {    
+    _exp_smooth(exp_smooth),
+    _dumping(dumping)   {    
 
     _as.start();
     ROS_INFO("BaseRCoMActionServer: Waiting for action server under %s...", control_client.c_str());
@@ -308,7 +314,8 @@ std::vector<double> BaseRCoMActionServer::_computeUpdate(Eigen::VectorXd& td, Ei
     auto dq = _rcom.computeFeedback(
         td, t, 
         p_trocar, pi, pip1,
-        Ji, Jip1, Jt
+        Ji, Jip1, Jt,
+        _dumping
     );
 
     for (int i = 0; i < q.size(); i++) {
@@ -640,7 +647,7 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionBasedVelocityCon
     // }
 
     // const auto t = std::get<1>(_t_deque.back());  // get last task
-    
+
     td = t + _rcom.getdt()*dtd;
 
     // Compute joint angles that satisfy desired positions

@@ -42,8 +42,9 @@ class RCoMImpl {
          * @param J_i Jacobian at p_i (Eigen::MatrixXd)
          * @param J_ip1 Jacobian at p_ip1 (Eigen::MatrixXd)
          * @param J_t task Jacobian (Eigen::MatrixXd)
+         * @param dumping dumping factor for the pseudo inverse (double)
          * @param lambda_regularizer add lambda regularizer, see eq. 7 paper (bool)
-         * @param rcm_priority consider RCoM as higher priority and solve task in RCoM nullspace
+         * @param rcm_priority consider RCoM as higher priority and solve task in RCoM nullspace (bool)
         **/
         template<typename derived>
         Eigen::VectorXd computeFeedback(
@@ -55,6 +56,7 @@ class RCoMImpl {
                 Eigen::MatrixXd& J_i,
                 Eigen::MatrixXd& J_ip1,
                 Eigen::MatrixXd& J_t,
+                double dumping=1.e-2,
                 bool lambda_regularizer=false,
                 bool rcm_priority=false
         );
@@ -148,6 +150,7 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         Eigen::MatrixXd& J_i,
         Eigen::MatrixXd& J_ip1,
         Eigen::MatrixXd& J_t,
+        double dumping,
         bool lambda_regularizer,
         bool rcm_priority
     ) {
@@ -192,7 +195,7 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         }
         else {
             // auto J_inverse = pseudoinverse(J);
-            auto J_inverse = dampedLeastSquares(J);
+            auto J_inverse = dampedLeastSquares(J, dumping);
 
             dq = J_inverse*(Kp*ep + Ki*ei + Kd*ed);
         
