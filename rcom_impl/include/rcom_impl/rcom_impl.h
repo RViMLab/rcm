@@ -43,6 +43,7 @@ class RCoMImpl {
          * @param J_ip1 Jacobian at p_ip1 (Eigen::MatrixXd)
          * @param J_t task Jacobian (Eigen::MatrixXd)
          * @param lambda_regularizer add lambda regularizer, see eq. 7 paper (bool)
+         * @param rcm_priority consider RCoM as higher priority and solve task in RCoM nullspace
         **/
         template<typename derived>
         Eigen::VectorXd computeFeedback(
@@ -54,7 +55,8 @@ class RCoMImpl {
                 Eigen::MatrixXd& J_i,
                 Eigen::MatrixXd& J_ip1,
                 Eigen::MatrixXd& J_t,
-                bool lambda_regularizer=false
+                bool lambda_regularizer=false,
+                bool rcm_priority=false
         );
 
         /**
@@ -146,7 +148,8 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         Eigen::MatrixXd& J_i,
         Eigen::MatrixXd& J_ip1,
         Eigen::MatrixXd& J_t,
-        bool lambda_regularizer
+        bool lambda_regularizer,
+        bool rcm_priority
     ) {
 
         // Compute Jacobians
@@ -159,10 +162,6 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         auto ep = std::get<0>(e);
         auto ei = std::get<1>(e);
         auto ed = std::get<2>(e);
-
-        // Compute feedback dq, eq. 7
-        // auto J_inverse = pseudoinverse(J);
-        auto J_inverse = dampedLeastSquares(J);
 
         int nt = J_t.rows();
         Eigen::MatrixXd Kp = Eigen::MatrixXd::Zero(3+nt, 3+nt);
@@ -181,10 +180,25 @@ Eigen::VectorXd RCoMImpl::computeFeedback(
         Ki.bottomRightCorner(3, 3) = _kircm.asDiagonal();
         Kd.bottomRightCorner(3, 3) = _kdrcm.asDiagonal();
 
-        Eigen::VectorXd dq = J_inverse*(Kp*ep + Ki*ei + Kd*ed);
+        // Compute feedback dq, eq. 7
+        Eigen::VectorXd dq;
+        if (rcm_priority) {
+            auto J_task_inverse = pseudoinverse(J.topRows(J_t.rows()), 0.);
+            auto J_rcm_inverse = pseudoinverse(J.bottomRows(J_rcm.rows()), 0.);
 
-        if (lambda_regularizer) {
-            dq += _computeLambdaRegularizer(J, J_inverse, _lambda);
+            dq = 
+                J_rcm_inverse*(Kp.bottomRightCorner(3, 3)*ep.tail(3) + Ki.bottomRightCorner(3, 3)*ei.tail(3) + Kd.bottomRightCorner(3, 3)*ed.tail(3)) +
+                (Eigen::MatrixXd::Identity(J_rcm_inverse.rows(), J_rcm_inverse.rows()) - J_rcm_inverse*J_rcm)*J_task_inverse*(Kp.topLeftCorner(nt, nt)*ep.head(nt));// + Kd.topLeftCorner(nt, nt)*ed.head(nt) + Ki.topLeftCorner(nt, nt)*ei.head(nt));
+        }
+        else {
+            // auto J_inverse = pseudoinverse(J);
+            auto J_inverse = dampedLeastSquares(J);
+
+            dq = J_inverse*(Kp*ep + Ki*ei + Kd*ed);
+        
+            if (lambda_regularizer) {
+                dq += _computeLambdaRegularizer(J, J_inverse, _lambda);
+            }
         }
 
         // Update lambda
