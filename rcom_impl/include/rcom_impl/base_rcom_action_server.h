@@ -204,8 +204,8 @@ void BaseRCoMActionServer::_goalCB(const rcom_msgs::rcomGoalConstPtr& goal) {
 
     // State machines
     if (goal->states.task.is_velocity) {  // Handle task velocity goal
-        _velocityControlStateMachine(td, p_trocar);
-        // _positionBasedVelocityControlStateMachine(td, p_trocar);
+        // _velocityControlStateMachine(td, p_trocar);
+        _positionBasedVelocityControlStateMachine(td, p_trocar);
         return;
     }
     if (!goal->states.task.is_velocity){  // Handle task position goal
@@ -620,7 +620,19 @@ actionlib::SimpleClientGoalState BaseRCoMActionServer::_positionBasedVelocityCon
     // Convert velocity task to position task
     auto q = _move_group.getCurrentJointValues();  // might introduce drift without feedback
     auto t = _computeTaskForwardKinematics(q);
+
+    // if (!dtd.isZero() || _t_deque.size() != _t_deque_size) {
+    //     if (!_appendTaskDeque(ros::Time::now().toNSec(), q)) {
+    //         ROS_DEBUG("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
+    //         _as.setAborted();
+    //         return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
+    //     }
+    // }
+
+    // const auto t = std::get<1>(_t_deque.back());  // get last task
+
     td = t + _rcom.getdt()*dtd;
+    // std::cout << "t: " << t.transpose() << " dtd: " << dtd.transpose() << " p_trocar: " << p_trocar.transpose() << std::endl;
 
     // Compute joint angles that satisfy desired positions
     q = _computeUpdate(td, p_trocar, false);
