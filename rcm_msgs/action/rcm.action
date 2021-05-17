@@ -1,0 +1,10 @@
+# goal definition
+rcm_msgs/rcm states
+---
+# result definition
+rcm_msgs/rcm states
+rcm_msgs/rcm errors
+---
+# feedback
+rcm_msgs/rcm states
+rcm_msgs/rcm errors

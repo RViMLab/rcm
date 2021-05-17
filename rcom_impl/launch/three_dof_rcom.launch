@@ -1,9 +1,0 @@
-<launch>
-    <arg name="robot_name" default="lbr"/>
-
-    <group ns="$(arg robot_name)">
-        <rosparam command="load" file="$(find rcom_impl)/config/three_dof_params.yml"/>
-        <node pkg="rcom_impl" name="three_dof_rcom_node" type="three_dof_rcom_node" output="screen"/>
-    </group>
-
-</launch>
