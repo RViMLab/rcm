@@ -33,7 +33,7 @@ class BaseRCMActionServer {
             std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
             std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
             double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter, 
-            double exp_smooth, double dumping
+            double exp_smooth, double dumping, bool rcm_priority
         );
 
         ~BaseRCMActionServer();
@@ -78,6 +78,9 @@ class BaseRCMActionServer {
 
         // Dumping factor for pseudo inverse
         double _dumping;
+
+        // Jacobian inversion with RCM priority
+        bool _rcm_priority;
 
         // Goal callback, state machine
         void _goalCB(const rcm_msgs::rcmGoalConstPtr& goal);
@@ -142,7 +145,7 @@ BaseRCMActionServer::BaseRCMActionServer(
     std::vector<double> kprcm, std::vector<double> kircm, std::vector<double> kdrcm, double lambda0, double dt, 
     std::string planning_group, double alpha, std::string link_pi, std::string link_pip1,
     double t1_td, double t1_p_trocar, double t2_td, double t2_p_trocar, std::vector<double> t_td_scale, int max_iter, 
-    double exp_smooth, double dumping
+    double exp_smooth, double dumping, bool rcm_priority
 ) : _action_server(action_server), _as(nh, action_server, boost::bind(&BaseRCMActionServer::_goalCB, this, _1), false),
     _control_client(control_client), _ac(nh, control_client, false),
     _rcm(
@@ -163,7 +166,8 @@ BaseRCMActionServer::BaseRCMActionServer(
     _t_deque_size(2),
     _dq_im1(_move_group.getActiveJoints().size()),
     _exp_smooth(exp_smooth),
-    _dumping(dumping)   {    
+    _dumping(dumping),
+    _rcm_priority(rcm_priority) {    
 
     _as.start();
     ROS_INFO("BaseRCMActionServer: Waiting for action server under %s...", control_client.c_str());
@@ -219,8 +223,8 @@ void BaseRCMActionServer::_goalCB(const rcm_msgs::rcmGoalConstPtr& goal) {
 
     // State machines
     if (goal->states.task.is_velocity) {  // Handle task velocity goal
-        // _velocityControlStateMachine(td, p_trocar);
-        _positionBasedVelocityControlStateMachine(td, p_trocar);
+        _velocityControlStateMachine(td, p_trocar);
+        // _positionBasedVelocityControlStateMachine(td, p_trocar);
         return;
     }
     if (!goal->states.task.is_velocity){  // Handle task position goal
@@ -315,7 +319,7 @@ std::vector<double> BaseRCMActionServer::_computeUpdate(Eigen::VectorXd& td, Eig
         td, t, 
         p_trocar, pi, pip1,
         Ji, Jip1, Jt,
-        _dumping
+        _dumping, false, _rcm_priority
     );
 
     for (int i = 0; i < q.size(); i++) {
@@ -586,40 +590,49 @@ actionlib::SimpleClientGoalState BaseRCMActionServer::_velocityControlStateMachi
     else {
         auto status = _executeGoal(q, false);  // don't wait for execution to finish
 
-        if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
-            q = _move_group.getCurrentJointValues();
-            auto time = ros::Time::now().toNSec();
-            if (!_appendTaskDeque(time, q)) {
-                ROS_DEBUG("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
-                _as.setAborted();
-                return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
-            }
+        // TODO: update feedback
+        _as.setSucceeded();
+        // Update lambda to remove drift
+        _rcm.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
+        return actionlib::SimpleClientGoalState::SUCCEEDED;
+        // TODO: update feedback
 
-            p = _computeRCMForwardKinematics(q);
-            prcm = _rcm.computePRCM(std::get<0>(p), std::get<1>(p));
-            if (!_computeTaskVelocity(_t_deque, t)) {
-                ROS_DEBUG("%s: Aborted due to frequency limit", _action_server.c_str());
-                _as.setAborted();
-                return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
-            };
-            e = _computeError(td, t, p_trocar, prcm);
+    // TODO: change this block
+    //     if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
+    //         q = _move_group.getCurrentJointValues();
+    //         auto time = ros::Time::now().toNSec();
+    //         if (!_appendTaskDeque(time, q)) {
+    //             ROS_DEBUG("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
+    //             _as.setAborted();
+    //             return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
+    //         }
 
-            // Update lambda to remove drift
-            _rcm.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
+    //         p = _computeRCMForwardKinematics(q);
+    //         prcm = _rcm.computePRCM(std::get<0>(p), std::get<1>(p));
+    //         if (!_computeTaskVelocity(_t_deque, t)) {
+    //             ROS_DEBUG("%s: Aborted due to frequency limit", _action_server.c_str());
+    //             _as.setAborted();
+    //             return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
+    //         };
+    //         e = _computeError(td, t, p_trocar, prcm);
 
-            auto ss = _streamState(td, t, p_trocar, prcm, e);
-            ROS_DEBUG("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
-            auto fb = _computeFeedback<rcm_msgs::rcmFeedback>(e, t, prcm, true);
-            auto rs = _computeFeedback<rcm_msgs::rcmResult>(e, t, prcm, true);
-            _as.publishFeedback(fb);
-            _as.setSucceeded(rs);
-            return actionlib::SimpleClientGoalState::SUCCEEDED;
-        }
-        else {
-            ROS_ERROR("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
-            _as.setAborted();
-            return actionlib::SimpleClientGoalState::ABORTED;
-        }
+    //         // Update lambda to remove drift
+    //         _rcm.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
+
+    //         auto ss = _streamState(td, t, p_trocar, prcm, e);
+    //         ROS_DEBUG("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+    //         auto fb = _computeFeedback<rcm_msgs::rcmFeedback>(e, t, prcm, true);
+    //         auto rs = _computeFeedback<rcm_msgs::rcmResult>(e, t, prcm, true);
+    //         _as.publishFeedback(fb);
+    //         _as.setSucceeded(rs);
+    //         return actionlib::SimpleClientGoalState::SUCCEEDED;
+    //     }
+    //     else {
+    //         ROS_ERROR("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
+    //         _as.setAborted();
+    //         return actionlib::SimpleClientGoalState::ABORTED;
+    //     }
+    // TODO: change this block
     }
 };
 

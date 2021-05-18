@@ -24,6 +24,7 @@ int main(int argc, char** argv) {
     std::vector<double> t_td_scale;
     int max_iter;
     double exp_smooth, dumping;
+    bool rcm_priority;
 
     nh.getParam("action_server", action_server);
     nh.getParam("control_client", control_client);
@@ -47,6 +48,7 @@ int main(int argc, char** argv) {
     nh.getParam("max_iter", max_iter);
     nh.getParam("exp_smooth", exp_smooth);
     nh.getParam("dumping", dumping);
+    nh.getParam("rcm_priority", rcm_priority);
 
     // Initialize position
     auto move_group = moveit::planning_interface::MoveGroupInterface(planning_group);
@@ -122,7 +124,7 @@ int main(int argc, char** argv) {
         kpt, kit, kdt, kprcm, kircm, kdrcm, lambda0, dt,
         planning_group, alpha, link_pi, link_pip1,
         t1_td, t1_p_trocar, t2_td, t2_p_trocar, t_td_scale, max_iter,
-        exp_smooth, dumping
+        exp_smooth, dumping, rcm_priority
     );
 
     ros::waitForShutdown();

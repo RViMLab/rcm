@@ -189,9 +189,12 @@ Eigen::VectorXd RCMImpl::computeFeedback(
             auto J_task_inverse = pseudoinverse(J.topRows(J_t.rows()), 0.);
             auto J_rcm_inverse = pseudoinverse(J.bottomRows(J_rcm.rows()), 0.);
 
-            dq = 
-                J_rcm_inverse*(Kp.bottomRightCorner(3, 3)*ep.tail(3) + Ki.bottomRightCorner(3, 3)*ei.tail(3) + Kd.bottomRightCorner(3, 3)*ed.tail(3)) +
-                (Eigen::MatrixXd::Identity(J_rcm_inverse.rows(), J_rcm_inverse.rows()) - J_rcm_inverse*J_rcm)*J_task_inverse*(Kp.topLeftCorner(nt, nt)*ep.head(nt));// + Kd.topLeftCorner(nt, nt)*ed.head(nt) + Ki.topLeftCorner(nt, nt)*ei.head(nt));
+            auto N_rcm = (Eigen::MatrixXd::Identity(J_rcm_inverse.rows(), J_rcm_inverse.rows()) - J_rcm_inverse*J_rcm);
+
+            auto dq_rcm = J_rcm_inverse*(Kp.bottomRightCorner(3, 3)*ep.tail(3) + Ki.bottomRightCorner(3, 3)*ei.tail(3) + Kd.bottomRightCorner(3, 3)*ed.tail(3));
+            auto dq_task = N_rcm*J_task_inverse*(Kp.topLeftCorner(nt, nt)*ep.head(nt) + Kd.topLeftCorner(nt, nt)*ed.head(nt) + Ki.topLeftCorner(nt, nt)*ei.head(nt));
+
+            dq = dq_rcm + dq_task;
         }
         else {
             // auto J_inverse = pseudoinverse(J);

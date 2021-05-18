@@ -35,6 +35,7 @@ t_td_scale: [1.0, 1.0, 1.0]
 # max number of iterations
 max_iter: 20
 
-# exponential smoothing in [0, 1] and dumping for pseudo inverse
+# exponential smoothing in [0, 1], dumping for pseudo inverse, RCM priority for nullspace optimization
 exp_smooth: 1.0  # 1.0 means no smoothing is applied
 dumping: 0.01
+rcm_priority: false
