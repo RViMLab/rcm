@@ -590,42 +590,62 @@ actionlib::SimpleClientGoalState BaseRCMActionServer::_velocityControlStateMachi
     else {
         auto status = _executeGoal(q, false);  // don't wait for execution to finish
 
-        // TODO: rework the statemachine
         if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
             q = _move_group.getCurrentJointValues();
-            auto time = ros::Time::now().toNSec();
-            if (!_appendTaskDeque(time, q)) {
-                ROS_DEBUG("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
-                _as.setAborted();
-                return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
-            }
-
             p = _computeRCMForwardKinematics(q);
             prcm = _rcm.computePRCM(std::get<0>(p), std::get<1>(p));
-            if (!_computeTaskVelocity(_t_deque, t)) {
-                ROS_DEBUG("%s: Aborted due to frequency limit", _action_server.c_str());
-                _as.setAborted();
-                return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
-            };
             e = _computeError(td, t, p_trocar, prcm);
 
             // Update lambda to remove drift
             _rcm.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
 
-            auto ss = _streamState(td, t, p_trocar, prcm, e);
-            ROS_DEBUG("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+            // Publish feedback
             auto fb = _computeFeedback<rcm_msgs::rcmFeedback>(e, t, prcm, true);
-            auto rs = _computeFeedback<rcm_msgs::rcmResult>(e, t, prcm, true);
             _as.publishFeedback(fb);
-            _as.setSucceeded(rs);
-            return actionlib::SimpleClientGoalState::SUCCEEDED;
+            return actionlib::SimpleClientGoalState::ACTIVE;
         }
         else {
             ROS_ERROR("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
             _as.setAborted();
             return actionlib::SimpleClientGoalState::ABORTED;
         }
-        // TODO: rework the statemachine
+
+        // // TODO: rework the statemachine
+        // if (status == actionlib::SimpleClientGoalState::SUCCEEDED || actionlib::SimpleClientGoalState::ACTIVE || actionlib::SimpleClientGoalState::PENDING) {
+        //     q = _move_group.getCurrentJointValues();
+        //     auto time = ros::Time::now().toNSec();
+        //     if (!_appendTaskDeque(time, q)) {
+        //         ROS_DEBUG("%s: Aborted due to task deque error, size %zu/%d", _action_server.c_str(), _t_deque.size(), _t_deque_size);
+        //         _as.setAborted();
+        //         return actionlib::SimpleClientGoalState::ABORTED;  // exit if buffer hasn't enough values
+        //     }
+
+        //     p = _computeRCMForwardKinematics(q);
+        //     prcm = _rcm.computePRCM(std::get<0>(p), std::get<1>(p));
+        //     if (!_computeTaskVelocity(_t_deque, t)) {
+        //         ROS_DEBUG("%s: Aborted due to frequency limit", _action_server.c_str());
+        //         _as.setAborted();
+        //         return actionlib::SimpleClientGoalState::ABORTED;  // abort if feedback cant be computed
+        //     };
+        //     e = _computeError(td, t, p_trocar, prcm);
+
+        //     // Update lambda to remove drift
+        //     _rcm.feedbackLambda(std::get<0>(p), std::get<1>(p), prcm);
+
+        //     auto ss = _streamState(td, t, p_trocar, prcm, e);
+        //     ROS_DEBUG("%s: Suceeded\npi:   (%f, %f, %f)\nprcm: (%f, %f, %f)\npip1: (%f, %f, %f)\n%s", _action_server.c_str(), std::get<0>(p)[0], std::get<0>(p)[1], std::get<0>(p)[2], prcm[0], prcm[1], prcm[2], std::get<1>(p)[0], std::get<1>(p)[1], std::get<1>(p)[2], ss.str().c_str());
+        //     auto fb = _computeFeedback<rcm_msgs::rcmFeedback>(e, t, prcm, true);
+        //     auto rs = _computeFeedback<rcm_msgs::rcmResult>(e, t, prcm, true);
+        //     _as.publishFeedback(fb);
+        //     _as.setSucceeded(rs);
+        //     return actionlib::SimpleClientGoalState::SUCCEEDED;
+        // }
+        // else {
+        //     ROS_ERROR("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
+        //     _as.setAborted();
+        //     return actionlib::SimpleClientGoalState::ABORTED;
+        // }
+        // // TODO: rework the statemachine
     }
 };
 
