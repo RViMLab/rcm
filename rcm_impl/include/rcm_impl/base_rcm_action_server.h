@@ -601,8 +601,10 @@ actionlib::SimpleClientGoalState BaseRCMActionServer::_velocityControlStateMachi
 
             // Publish feedback
             auto fb = _computeFeedback<rcm_msgs::rcmFeedback>(e, t, prcm, true);
+            auto rs = _computeFeedback<rcm_msgs::rcmResult>(e, t, prcm, true);
             _as.publishFeedback(fb);
-            return actionlib::SimpleClientGoalState::ACTIVE;
+            _as.setSucceeded(rs);
+            return actionlib::SimpleClientGoalState::SUCCEEDED;
         }
         else {
             ROS_ERROR("%s: Aborted due to client %s failure", _action_server.c_str(), _control_client.c_str());
